@@ -525,3 +525,13 @@ Manual smoke checklist for the URL scheme + AppIntents shipped in v0.7.
 - [ ] Fire a layout on a display with no visible windows ("no windows" notification) — the tick does **not** move.
 - [ ] Toggle Free Mode on — rows dim, the tick stays put.
 - [ ] Quit and relaunch — nothing is ticked (state is in-memory by design).
+
+### Update to newest, not next (single-hop upgrade)
+
+- [ ] Install an old build (e.g. v0.5.0) and launch — the banner offers the **newest** release, not v0.5.1.
+- [ ] Click Install and Restart — the app comes back on the newest version, with no second update banner waiting.
+- [ ] Temporarily mark the newest GitHub release as a prerelease, relaunch — the banner offers the highest *stable* release instead, and never the prerelease.
+- [ ] Publish a release whose tag points at an older commit than the previous release, relaunch on an old build — the banner still offers the highest version number, not the one GitHub sorts first. (This is the case `releases/latest` got wrong.)
+- [ ] Run the newest version — no banner appears.
+- [ ] While on an old build with a banner showing, install the newest DMG by hand and relaunch — the banner is gone, not stale.
+- [ ] Airplane mode, relaunch — no banner, no crash, no error dialog.

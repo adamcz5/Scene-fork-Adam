@@ -26,8 +26,23 @@ final class UpdateChecker: ObservableObject {
     /// release since v0.4.x has shipped one).
     @Published private(set) var dmgURL: URL?
 
+    /// The full release listing, **not** `releases/latest`.
+    ///
+    /// GitHub defines `releases/latest` as the most recent non-prerelease,
+    /// non-draft release sorted by `created_at` — where `created_at` is the
+    /// date of the commit the tag points at, not the publish date. A hotfix
+    /// cut from an older commit therefore sorts *below* the release it
+    /// supersedes, and `releases/latest` hands back the older one. A user on a
+    /// much older build would be offered that, install it, and be offered the
+    /// next one on relaunch: updating one version at a time instead of
+    /// jumping straight to newest.
+    ///
+    /// Listing and picking the highest tag ourselves makes "always offer the
+    /// newest" true by construction. One page of 100 covers Scene's history
+    /// many times over; if it ever overflows, GitHub returns newest-created
+    /// first, so page 1 still holds every recent release.
     private let apiURL = URL(string:
-        "https://api.github.com/repos/ChiFungHillmanChan/macbook-resizer/releases/latest"
+        "https://api.github.com/repos/ChiFungHillmanChan/macbook-resizer/releases?per_page=100"
     )!
     private let lastCheckKey = "com.scene.UpdateChecker.lastCheckedAt"
     private let minInterval: TimeInterval = 24 * 60 * 60
@@ -102,19 +117,37 @@ final class UpdateChecker: ObservableObject {
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            let release = try JSONDecoder().decode(Release.self, from: data)
+            let releases = try JSONDecoder().decode([Release].self, from: data)
             UserDefaults.standard.set(Date(), forKey: lastCheckKey)
+
+            // Drafts aren't public and prereleases aren't for the update
+            // channel — a prerelease at the top of the list must not become
+            // everyone's "latest".
+            let installable = releases.filter { !$0.draft && !$0.prerelease }
+            guard let idx = indexOfHighestVersion(tags: installable.map(\.tagName)) else {
+                clearAvailableUpdate()
+                return
+            }
+            let release = installable[idx]
 
             guard let bundleVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
                   isVersionTag(release.tagName, newerThan: bundleVersion),
                   let url = URL(string: release.htmlURL)
-            else { return }
+            else {
+                // Already current (or the bundle version is unreadable).
+                // Clear rather than leave a stale banner pointing at a
+                // version the user has since installed by hand.
+                clearAvailableUpdate()
+                return
+            }
 
             self.availableVersion = Self.normalizeTag(release.tagName)
             self.releasePageURL = url
             // First .dmg asset wins. Releases bundling multiple DMGs (e.g.
             // separate Apple Silicon / Intel slices) would need extra
             // routing here, but v0.5.3+ ships a single universal DMG.
+            // A release with no DMG leaves this nil and the menu falls back
+            // to opening the release page in the browser.
             self.dmgURL = release.assets
                 .first(where: { $0.name.lowercased().hasSuffix(".dmg") })
                 .flatMap { URL(string: $0.browserDownloadURL) }
@@ -127,14 +160,24 @@ final class UpdateChecker: ObservableObject {
         tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
     }
 
+    private func clearAvailableUpdate() {
+        availableVersion = nil
+        releasePageURL = nil
+        dmgURL = nil
+    }
+
     private struct Release: Decodable {
         let tagName: String
         let htmlURL: String
         let assets: [Asset]
+        let draft: Bool
+        let prerelease: Bool
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
             case htmlURL = "html_url"
             case assets
+            case draft
+            case prerelease
         }
     }
 

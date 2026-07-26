@@ -93,3 +93,71 @@ final class VersionCompareTests: XCTestCase {
         XCTAssertFalse(isVersionTag("v", newerThan: "0.4.2"))
     }
 }
+
+/// `indexOfHighestVersion` replaces GitHub's `releases/latest`, which sorts by
+/// the tag's *commit* date rather than by version number.
+final class HighestVersionSelectionTests: XCTestCase {
+    func testEmptyListReturnsNil() {
+        XCTAssertNil(indexOfHighestVersion(tags: []))
+    }
+
+    func testSingleTagReturnsItsIndex() {
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.7.3"]), 0)
+    }
+
+    func testPicksHighestFromGitHubListingOrder() {
+        // GitHub returns newest-created first, which is usually also newest by
+        // version — the happy path must keep working.
+        let tags = ["v0.7.3", "v0.7.2", "v0.7.1", "v0.6.1", "v0.1.0"]
+        XCTAssertEqual(indexOfHighestVersion(tags: tags), 0)
+    }
+
+    func testPicksHighestWhenCreatedAtOrderDisagreesWithVersionOrder() {
+        // The reported bug: v0.7.4 was cut from an older commit, so GitHub
+        // sorts it *below* v0.7.3 and `releases/latest` returns v0.7.3. A user
+        // on v0.5.0 would be offered v0.7.3, install it, then be offered
+        // v0.7.4 on relaunch — one version at a time.
+        let tags = ["v0.7.3", "v0.7.4", "v0.7.2"]
+        XCTAssertEqual(indexOfHighestVersion(tags: tags), 1)
+    }
+
+    func testDoubleDigitComponentBeatsSingleDigit() {
+        // Pure string sorting puts "v0.9.0" above "v0.10.0". Numeric must not.
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.9.0", "v0.10.0"]), 1)
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.10.0", "v0.9.0"]), 0)
+    }
+
+    func testMajorBumpWins() {
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.99.99", "v1.0.0"]), 1)
+    }
+
+    func testUnparseableTagsAreSkipped() {
+        XCTAssertEqual(indexOfHighestVersion(tags: ["nightly", "v0.7.3"]), 1)
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.7.3", "nightly"]), 0)
+    }
+
+    func testAllUnparseableReturnsNil() {
+        XCTAssertNil(indexOfHighestVersion(tags: ["nightly", "", "v", "garbage"]))
+    }
+
+    func testTieResolvesToEarliestIndex() {
+        // Earliest index is newest by created_at in GitHub's listing order.
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.7.3", "v0.7.3"]), 0)
+    }
+
+    func testZeroPaddedEquivalentsTie() {
+        // "0.7" == "0.7.0" — neither is newer, so the earliest index holds.
+        XCTAssertEqual(indexOfHighestVersion(tags: ["v0.7", "v0.7.0"]), 0)
+    }
+
+    func testRealSceneReleaseHistoryPicksNewest() {
+        let tags = [
+            "v0.7.3", "v0.7.2", "v0.7.1", "v0.7.0", "v0.6.1", "v0.6.0",
+            "v0.5.7", "v0.5.6", "v0.5.5", "v0.5.4", "v0.5.3", "v0.5.2",
+            "v0.5.1", "v0.5.0", "v0.4.3", "v0.4.2", "v0.4.1", "v0.4.0", "v0.1.0",
+        ]
+        XCTAssertEqual(indexOfHighestVersion(tags: tags), 0)
+        // And a v0.1.0 user jumps straight to it, not through 18 hops.
+        XCTAssertTrue(isVersionTag(tags[0], newerThan: "0.1.0"))
+    }
+}
