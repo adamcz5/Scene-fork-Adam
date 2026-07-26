@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 Quarantine is stripped automatically — no "cannot be verified" prompt. On first launch, grant Accessibility in **System Settings → Privacy & Security → Accessibility**.
 
-**Or download the DMG directly**: **[Scene-0.7.2.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.2/Scene-0.7.2.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
+**Or download the DMG directly**: **[Scene-0.7.3.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.3/Scene-0.7.3.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
 
 All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · DMG users, see [`docs/INSTALL.md`](docs/INSTALL.md) for the one-time Gatekeeper + Accessibility-permission steps.
 
@@ -47,11 +47,11 @@ All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resi
 
 ▶ [Watch the 30-second demo](docs/media/scene-marketing.mp4) (MP4, 13 MB)
 
-## What's new in v0.7.2
+## What's new in v0.7.3
 
-**Liquid Glass Settings on macOS 26 (Tahoe)** — the Settings window adopts the system's Liquid Glass design: the title bar disappears (traffic lights float over the sidebar), the sidebar becomes the floating glass panel, and the whole window sits on a translucent blur of whatever is behind it. On macOS 14/15 the window keeps its existing look.
+**Re-applying a layout no longer disturbs windows already in place** — close one window out of your Quads, open a different app, and click Quads again: the three windows still in their slots stay exactly where they are, and only the new window moves into the freed slot. Previously every window was re-mapped by z-order, so one small change reshuffled the whole screen. Drag-swapped positions survive re-applies too.
 
-**Settings polish on every macOS version** — all five tabs now share the same top chrome and start from the top; About and Interaction were previously vertically centered. Tests: 363/363.
+**The menu bar dropdown stays open while you use it** — clicking Free Mode, a layout, or a workspace no longer dismisses the menu, so you can toggle Free Mode off and fire a layout in one visit. Checkmarks now update live in front of you. The panel closes when you click outside it, press Escape, or open Settings. Tests: 363 → 371.
 
 For the full version history, see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -63,6 +63,7 @@ For the full version history, see [`CHANGELOG.md`](CHANGELOG.md).
 - **Smooth window animation** with adjustable duration (100–500 ms) and easing (Linear / Ease Out / Spring)
 - **Settings window** — Workspaces / Layouts / Hotkeys / Interaction / About (open via menu bar icon → Settings… or ⌘,)
 - **One click, all windows** — frontmost window goes to slot 1, the rest follow z-order
+- **Sticky re-apply** — windows already sitting in a slot stay put when you re-fire the same layout; only unplaced windows move
 - **Overflow handling** — windows beyond slot count get minimized
 - **Electron-aware** — retries ±5 px corrections for Cursor, VS Code, Slack, etc.
 - **Multi-display** — only rearranges windows on the screen under the mouse
@@ -106,7 +107,7 @@ In Xcode, select the `SceneApp` scheme and press ⌘R. The app runs as a menu ba
 ### Build a distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.2    # produces dist/Scene-0.7.2.dmg (universal, notarized)
+./scripts/build-dmg.sh 0.7.3    # produces dist/Scene-0.7.3.dmg (universal, notarized)
 ```
 
 This builds a universal (arm64 + x86_64) binary, Developer ID-signs it, submits it to Apple for notarization, and packages it into a DMG with an `Applications` drop shortcut. Both Apple Silicon and Intel Macs install from the same DMG. Set `SKIP_NOTARY=1` for a local ad-hoc build that skips the Apple notary submission (useful while iterating on DMG layout).

@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 自動幫你清走 quarantine flag，唔會彈「cannot be verified」嘅 Gatekeeper 警告。首次開 Scene 嗰陣，去 **System Settings → Privacy & Security → Accessibility** 撳着 Scene 就得。
 
-**或者直接下載 DMG**：**[Scene-0.7.2.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.2/Scene-0.7.2.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
+**或者直接下載 DMG**：**[Scene-0.7.3.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.3/Scene-0.7.3.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
 
 所有版本：[Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · 用 DMG 嘅話，跟住 [`docs/INSTALL.md`](docs/INSTALL.md) 做一次性嘅 Gatekeeper + Accessibility 授權步驟。
 
@@ -47,11 +47,11 @@ brew install --cask chifunghillmanchan/tap/scene
 
 ▶ [睇 30 秒示範片](docs/media/scene-marketing.mp4)（MP4，13 MB）
 
-## v0.7.2 嘅新功能
+## v0.7.3 嘅新功能
 
-**Liquid Glass 設定視窗（macOS 26 Tahoe）** — 喺 macOS Tahoe 上面，Settings 視窗用埋系統嘅 Liquid Glass 設計：冇咗 title bar（紅黃綠掣直接浮喺 sidebar 上面）、sidebar 變咗浮起嘅玻璃 panel，成個視窗仲會半透明咁 blur 住後面嘅嘢。macOS 14/15 就一切照舊。
+**再撳同一個 layout，唔會再搞亂已經入位嘅 window** — Quads 開住四個 window，閂咗其中一個，再開另一個 app 然後再撳 Quads：仲喺自己 slot 度嘅三個 window 完全唔會動，只有新嗰個會移入去空出嚟嘅 slot。以前係全部按 z-order 重新排一次，所以改一樣嘢就搞到成個螢幕重新洗牌。拖過位換咗嘅 window 都會保住新位置。
 
-**設定頁執靚咗（所有 macOS 版本）** — 五個 tab 而家統一晒頂部 chrome，全部由頂開始排；之前 About 同 Interaction 係垂直置中嘅。Tests: 363/363。
+**menu bar 個 menu 唔會撳一下就閂** — 撳 Free Mode、layout 或者 workspace 都唔會關掉個 menu，所以你可以熄咗 Free Mode 之後即刻撳 layout，一次搞完。checkmark 而家喺你眼前即時更新。撳出去外面、按 Escape、或者開 Settings 就會閂。Tests: 363 → 371。
 
 完整版本歷史見 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -63,6 +63,7 @@ brew install --cask chifunghillmanchan/tap/scene
 - **Smooth window animation** — duration 100–500 ms 可調，easing 揀 Linear / Ease Out / Spring；native app 60Hz、Electron app 30Hz
 - **設定視窗** — Workspaces / Layouts / Hotkeys / Interaction / About（menu bar icon → Settings… 或 ⌘,）
 - **撳一下，window 全部入位** — frontmost 入 slot 1，其餘按 z-order 排
+- **再撳唔會搞亂** — 已經喺 slot 度嘅 window 再撳同一個 layout 都唔會動，只有未入位嘅先會移
 - **Overflow 處理** — 多過 slot count 嘅 window 自動 minimize
 - **拖 window 換位** — 揸住 placed window 拖落另一個 placed window，即時換位
 - **拖邊同步** — Tile 完之後拖一個 window 嘅邊，隔籬嗰個自動跟住縮放填 gap
@@ -108,7 +109,7 @@ Xcode 揀 `SceneApp` scheme → ⌘R。App 以 menu bar extra 形式行（冇 Do
 ### Build distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.2    # 出 dist/Scene-0.7.2.dmg（universal + notarized）
+./scripts/build-dmg.sh 0.7.3    # 出 dist/Scene-0.7.3.dmg（universal + notarized）
 ```
 
 Build universal（arm64 + x86_64）binary，Developer ID sign，submit 去 Apple notary，pack 入 DMG 連 `Applications` drop shortcut。Apple Silicon 同 Intel Mac 用同一個 DMG。如果想 local iterate DMG layout，set `SKIP_NOTARY=1` 會 skip Apple notary submission，改用 ad-hoc sign。
