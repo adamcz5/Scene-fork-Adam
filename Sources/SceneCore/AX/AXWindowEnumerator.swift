@@ -27,8 +27,13 @@ public enum AXWindowEnumerator {
                 let cgBounds = boundsFromDict(boundsDict)
             else { continue }
 
+            // Ownership test uses `frame`, not `visibleFrame`: a window whose
+            // center happens to sit in the Dock strip still belongs to this
+            // display, and `visibleFrame` would drop it from the plan entirely
+            // — and drop it only while the Dock happened to be on this screen,
+            // since the Dock follows the pointer. See `TilingFrame`.
             let centerTopLeft = CGPoint(x: cgBounds.midX, y: cgBounds.midY)
-            guard screen.visibleFrame.contains(DisplayCoordinates.axToNS(centerTopLeft)) else { continue }
+            guard screen.frame.contains(DisplayCoordinates.axToNS(centerTopLeft)) else { continue }
 
             let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
             if let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds) {

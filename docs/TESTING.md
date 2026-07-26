@@ -489,3 +489,39 @@ Manual smoke checklist for the URL scheme + AppIntents shipped in v0.7.
 - [ ] With 4 placed plus 1 extra window, re-click Quads — the extra minimizes, the placed 4 are untouched.
 - [ ] Click a different layout — full remap by z-order (previous behavior).
 - [ ] Drag-swap and seam-resize still work immediately after a sticky re-apply (observers rebuilt from the new plan).
+
+## V0.7.4 — Dock-stable tiling frame + active-layout tick
+
+### Dock-stable frame (needs two displays)
+
+- [ ] Dock on display A. Apply Quads to 4 windows on A.
+- [ ] Move the pointer to the bottom edge of display B so the Dock hops to B.
+- [ ] Re-click Quads on A — **nothing moves**. (Before the fix: all 4 resized and shifted ~70pt.)
+- [ ] Move the Dock back to A, re-click Quads on A — still nothing moves.
+- [ ] Tile a layout on B (the Dock-less display) — windows stop short of the bottom edge by the Dock's thickness. This is the accepted trade-off, not a bug.
+- [ ] Set Dock to left edge, repeat: re-apply after the Dock hops is stationary; the Dock-less display reserves the strip on its left.
+- [ ] Turn Dock auto-hide on — layouts now reach the bottom edge on both displays, and re-apply is still stationary.
+- [ ] Drag-swap two windows immediately after a re-apply on the Dock-less display — the swap lands in the right slot (no offset by the Dock strip).
+- [ ] Drag a seam on the Dock-less display — the companion window resizes to meet it exactly.
+
+### Single display (regression — must be unchanged)
+
+- [ ] One display, Dock visible at the bottom. Apply Quads — windows fill exactly to the top of the Dock, same as before.
+- [ ] Re-click Quads — nothing moves.
+- [ ] Dock on the left, apply Halves — windows start exactly at the Dock's right edge.
+
+### Window ownership over the Dock strip
+
+- [ ] Drag a window so its center sits over the Dock, then fire a layout — the window is included in the plan (previously it was skipped).
+
+### Active-layout tick
+
+- [ ] Open the panel — no layout is ticked on a fresh launch.
+- [ ] Click Quads — a tick appears at the far right of the Quads row, after its hotkey chord; the name goes semibold.
+- [ ] Hotkey chords on the other rows stay aligned (the tick column is reserved on every row).
+- [ ] Click Halves — the tick moves to Halves, Quads un-ticks.
+- [ ] Fire a layout by hotkey rather than clicking — the tick still follows.
+- [ ] Activate a workspace — the tick moves to that workspace's layout.
+- [ ] Fire a layout on a display with no visible windows ("no windows" notification) — the tick does **not** move.
+- [ ] Toggle Free Mode on — rows dim, the tick stays put.
+- [ ] Quit and relaunch — nothing is ticked (state is in-memory by design).

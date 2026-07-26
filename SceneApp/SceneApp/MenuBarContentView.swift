@@ -164,14 +164,20 @@ struct MenuBarContentView: View {
     }
 
     private func layoutRow(_ layout: CustomLayout) -> some View {
-        Button(action: { coordinator.applyLayout(layout) }) {
+        let isActive = coordinator.activeLayoutID == layout.id
+        return Button(action: { coordinator.applyLayout(layout) }) {
             HStack(spacing: 6) {
                 LayoutThumbnail(layout: layout, size: CGSize(width: 24, height: 16))
                 Text(layout.name)
+                    .fontWeight(isActive ? .semibold : .regular)
                 Spacer()
                 if let h = layout.hotkey {
                     hotkeyLabel(h.displayString)
                 }
+                // Trailing tick for the layout applied most recently. Always
+                // occupies its column so hotkey chords stay aligned whether or
+                // not the row is ticked.
+                checkmarkColumn(isActive)
             }
         }
         .buttonStyle(MenuRowButtonStyle())

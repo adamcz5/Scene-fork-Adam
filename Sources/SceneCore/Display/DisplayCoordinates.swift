@@ -10,9 +10,9 @@ import CoreGraphics
 ///   `CGDisplayBounds`): top-left origin, y increases downward, anchored at the
 ///   primary display's top-left.
 ///
-/// Scene computes layouts against `NSScreen.visibleFrame` but writes them via
-/// AX, so every boundary crossing needs a vertical flip. On a single display,
-/// or on the primary display specifically, `NS.visibleFrame.minY == 0` happens
+/// Scene computes layouts against `TilingFrame` (an NS rect) but writes them
+/// via AX, so every boundary crossing needs a vertical flip. On a single
+/// display, or on the primary display specifically, `NS tiling frame.minY == 0` happens
 /// to coincide with `AX.y == 0` for a full-height slot, which masks the bug.
 /// On a secondary display with a non-zero NS offset, the flip is required —
 /// otherwise windows land at the wrong y (commonly in the bottom half).

@@ -20,6 +20,17 @@ final class Coordinator: ObservableObject {
     /// `ObservableObject`.
     @Published private(set) var layoutListVersion: Int = 0
 
+    /// The layout most recently applied *successfully*, used to tick its row
+    /// in the menu panel. Set only on the success path of `performApplyLayout`
+    /// so a no-op fire (no visible windows, AX revoked mid-call) never ticks a
+    /// row the user's screen doesn't reflect.
+    ///
+    /// In-memory only, like `freeMode` — after a relaunch nothing is ticked,
+    /// because Scene genuinely doesn't know whether the windows are still
+    /// tiled. Single value, last-applied wins: apply one layout on display A
+    /// and another on B and the tick follows the most recent.
+    @Published private(set) var activeLayoutID: UUID?
+
     /// V0.6.1 Free Mode toggle. When `true`, all of Scene's automatic
     /// behavior pauses: layout hotkeys / menu clicks no-op, workspace
     /// activation no-ops, drag-swap and seam-resize observers short-circuit,
@@ -240,9 +251,13 @@ final class Coordinator: ObservableObject {
                     secsSinceLastChange: nil
                 )
             )))
+            // `TilingFrame`, not `screen.visibleFrame` — the Dock hops between
+            // displays with the pointer, so `visibleFrame` would hand us a rect
+            // ~70pt different on a re-apply and shift every window. See
+            // `TilingFrame` for the full reasoning.
             let plan = LayoutEngine.plan(
                 windows: windows,
-                visibleFrame: screen.visibleFrame,
+                visibleFrame: TilingFrame.forScreen(screen),
                 layout: custom.toLayout()
             )
             let cfg = settingsStore.animation
@@ -268,6 +283,7 @@ final class Coordinator: ObservableObject {
             }
             log.info("applied \(custom.name, privacy: .public) animated=\(shouldAnimate)")
             rebuildDragSwapObservers(plan: plan, windows: windows, layout: custom.toLayout(), customLayout: custom, screen: screen)
+            activeLayoutID = custom.id
             return true
         } catch AXWindowEnumerator.EnumerationError.permissionDenied {
             stopDragSwapInfrastructure()
@@ -448,7 +464,11 @@ final class Coordinator: ObservableObject {
                 // map only refreshed on `applyLayout`, so the 2nd swap broke.
                 guard let self else { return }
                 for (id, slot) in updates { self.lastWindowToSlotIdx[id] = slot }
-            }
+            },
+            // Must match the frame `performApplyLayout` tiled into, or a drag
+            // would snap the window to a slot rect belonging to a different
+            // frame than the one every other window was placed in.
+            visibleFrameOverride: { TilingFrame.forScreen($0) }
         )
     }
 
@@ -479,7 +499,10 @@ final class Coordinator: ObservableObject {
                     windowToSlotIdx: self.lastWindowToSlotIdx
                 )
             },
-            config: { [weak self] in self?.settingsStore.dragSwap ?? .default }
+            config: { [weak self] in self?.settingsStore.dragSwap ?? .default },
+            // Same reason as drag-swap: reflow must measure the seam against
+            // the frame the layout was actually tiled into.
+            visibleFrameOverride: { TilingFrame.forScreen($0) }
         )
     }
 
