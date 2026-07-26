@@ -2,25 +2,57 @@ import CoreGraphics
 import os
 
 public enum LayoutEngine {
+    /// Maps windows to slots. Windows whose frame already sits on a slot rect
+    /// (within `stickyTolerance` points) keep that slot — re-applying a layout
+    /// must not reshuffle windows that are already in position. Remaining
+    /// windows fill the remaining slots in z-order; leftovers get minimized.
+    /// A sticky window's placement targets the slot's exact rect, so
+    /// sub-tolerance drift self-heals on re-apply.
     public static func plan(
         windows: [any WindowRef],
         visibleFrame: CGRect,
-        layout: Layout
+        layout: Layout,
+        stickyTolerance: CGFloat = 10
     ) -> Plan {
-        let slotCount = layout.slots.count
-        let placedCount = min(windows.count, slotCount)
-        let placements: [Placement] = (0..<placedCount).map { i in
+        let slotRects = layout.slots.map { $0.absoluteRect(in: visibleFrame) }
+
+        // Sticky pass — z-order priority when two windows sit on the same rect.
+        var slotToWindow: [Int: any WindowRef] = [:]
+        var stickyIDs = Set<CGWindowID>()
+        for window in windows {
+            let claimed = slotRects.indices.first { idx in
+                slotToWindow[idx] == nil &&
+                rectsApproxEqual(window.frame, slotRects[idx], tolerance: stickyTolerance)
+            }
+            if let idx = claimed {
+                slotToWindow[idx] = window
+                stickyIDs.insert(window.id)
+            }
+        }
+
+        // Fill pass — remaining windows (z-order) into remaining slots (index order).
+        var overflow: [CGWindowID] = []
+        var freeSlots = slotRects.indices.filter { slotToWindow[$0] == nil }[...]
+        for window in windows where !stickyIDs.contains(window.id) {
+            if let idx = freeSlots.popFirst() {
+                slotToWindow[idx] = window
+            } else {
+                overflow.append(window.id)
+            }
+        }
+
+        let placements = slotToWindow.keys.sorted().map { idx in
             Placement(
-                windowID: windows[i].id,
-                targetFrame: layout.slots[i].absoluteRect(in: visibleFrame),
-                slotIndex: i
+                windowID: slotToWindow[idx]!.id,
+                targetFrame: slotRects[idx],
+                slotIndex: idx
             )
         }
-        let toMinimize: [CGWindowID] = windows.count > slotCount
-            ? windows[slotCount...].map(\.id)
-            : []
-        let leftEmpty = max(0, slotCount - windows.count)
-        return Plan(placements: placements, toMinimize: toMinimize, leftEmptySlotCount: leftEmpty)
+        return Plan(
+            placements: placements,
+            toMinimize: overflow,
+            leftEmptySlotCount: slotRects.count - slotToWindow.count
+        )
     }
 }
 
