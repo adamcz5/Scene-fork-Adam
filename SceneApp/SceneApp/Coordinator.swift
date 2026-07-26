@@ -517,11 +517,13 @@ final class Coordinator: ObservableObject {
         lastAppliedLayout = layout
         lastAppliedCustomLayout = customLayout
         lastScreen = screen
-        // Snapshot window→slot mapping. Plan.placements is parallel to layout.slots,
-        // so index in the array = slot index. finishDrag uses this to recover the
-        // dragged window's original slot without trusting AX-live `source.frame`.
+        // Snapshot window→slot mapping. Placements carry their slot index
+        // explicitly (sticky re-apply can leave gaps, e.g. slots {0, 2, 3}
+        // claimed), so never infer the slot from array position. finishDrag
+        // uses this to recover the dragged window's original slot without
+        // trusting AX-live `source.frame`.
         lastWindowToSlotIdx = Dictionary(
-            uniqueKeysWithValues: plan.placements.enumerated().map { ($1.windowID, $0) }
+            uniqueKeysWithValues: plan.placements.map { ($0.windowID, $0.slotIndex) }
         )
         let placedIDs = Set(lastPlacedWindows.map { $0.id })
         guard settingsStore.dragSwap.enabled, !placedIDs.isEmpty else {

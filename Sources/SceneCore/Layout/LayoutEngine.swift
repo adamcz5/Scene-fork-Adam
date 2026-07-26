@@ -12,7 +12,8 @@ public enum LayoutEngine {
         let placements: [Placement] = (0..<placedCount).map { i in
             Placement(
                 windowID: windows[i].id,
-                targetFrame: layout.slots[i].absoluteRect(in: visibleFrame)
+                targetFrame: layout.slots[i].absoluteRect(in: visibleFrame),
+                slotIndex: i
             )
         }
         let toMinimize: [CGWindowID] = windows.count > slotCount

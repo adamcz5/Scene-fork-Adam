@@ -11,8 +11,8 @@ final class LayoutEnginePlanTests: XCTestCase {
         ]
         let plan = LayoutEngine.plan(windows: ws, visibleFrame: vf, layout: .halves)
         XCTAssertEqual(plan.placements, [
-            Placement(windowID: 1, targetFrame: CGRect(x: 0,   y: 0, width: 500, height: 1000)),
-            Placement(windowID: 2, targetFrame: CGRect(x: 500, y: 0, width: 500, height: 1000)),
+            Placement(windowID: 1, targetFrame: CGRect(x: 0,   y: 0, width: 500, height: 1000), slotIndex: 0),
+            Placement(windowID: 2, targetFrame: CGRect(x: 500, y: 0, width: 500, height: 1000), slotIndex: 1),
         ])
         XCTAssertTrue(plan.toMinimize.isEmpty)
         XCTAssertEqual(plan.leftEmptySlotCount, 0)
