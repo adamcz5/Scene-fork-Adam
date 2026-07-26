@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 Quarantine is stripped automatically — no "cannot be verified" prompt. On first launch, grant Accessibility in **System Settings → Privacy & Security → Accessibility**.
 
-**Or download the DMG directly**: **[Scene-0.7.3.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.3/Scene-0.7.3.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
+**Or download the DMG directly**: **[Scene-0.7.4.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.4/Scene-0.7.4.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
 
 All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · DMG users, see [`docs/INSTALL.md`](docs/INSTALL.md) for the one-time Gatekeeper + Accessibility-permission steps.
 
@@ -47,11 +47,13 @@ All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resi
 
 ▶ [Watch the 30-second demo](docs/media/scene-marketing.mp4) (MP4, 13 MB)
 
-## What's new in v0.7.3
+## What's new in v0.7.4
 
-**Re-applying a layout no longer disturbs windows already in place** — close one window out of your Quads, open a different app, and click Quads again: the three windows still in their slots stay exactly where they are, and only the new window moves into the freed slot. Previously every window was re-mapped by z-order, so one small change reshuffled the whole screen. Drag-swapped positions survive re-applies too.
+**The Dock no longer drags your layout around** — on a multi-display Mac the Dock follows your pointer, and macOS reserves space for it only on whichever display it currently sits on. Scene tiled into that reserved space, so moving the Dock to your other monitor and re-firing a layout resized and shifted every window by the Dock's height. Scene now reserves the Dock's thickness on every display, making a layout's target rects depend only on your display arrangement — re-apply is stationary no matter where the Dock has wandered. The trade-off: the display the Dock is *not* on reserves that strip too. With Dock auto-hide there's no cost at all, and single-display Macs are completely unaffected. Windows parked over the Dock are now included in layouts as well, instead of being invisible to Scene.
 
-**The menu bar dropdown stays open while you use it** — clicking Free Mode, a layout, or a workspace no longer dismisses the menu, so you can toggle Free Mode off and fire a layout in one visit. Checkmarks now update live in front of you. The panel closes when you click outside it, press Escape, or open Settings. Tests: 363 → 371.
+**The menu bar panel ticks the layout you applied** — a checkmark sits at the far right of the active layout's row, and its name goes bold, so you can tell at a glance which layout is live without counting windows. Hotkey chords stay aligned whether or not a row is ticked.
+
+**Updating from an old build goes straight to the newest release** — Scene asked GitHub for `releases/latest`, which sounds like "newest version" but is actually "most recent release sorted by the date of the commit its tag points at". Cut a hotfix from an older commit and that endpoint returns the release it supersedes, so a user far behind could be offered an older build, install it, and be handed the next one on relaunch — climbing versions one at a time. Scene now reads the full release list and picks the highest version itself, skipping drafts and prereleases. Tests: 371 → 394.
 
 For the full version history, see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -107,7 +109,7 @@ In Xcode, select the `SceneApp` scheme and press ⌘R. The app runs as a menu ba
 ### Build a distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.3    # produces dist/Scene-0.7.3.dmg (universal, notarized)
+./scripts/build-dmg.sh 0.7.4    # produces dist/Scene-0.7.4.dmg (universal, notarized)
 ```
 
 This builds a universal (arm64 + x86_64) binary, Developer ID-signs it, submits it to Apple for notarization, and packages it into a DMG with an `Applications` drop shortcut. Both Apple Silicon and Intel Macs install from the same DMG. Set `SKIP_NOTARY=1` for a local ad-hoc build that skips the Apple notary submission (useful while iterating on DMG layout).

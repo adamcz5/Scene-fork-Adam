@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 自動幫你清走 quarantine flag，唔會彈「cannot be verified」嘅 Gatekeeper 警告。首次開 Scene 嗰陣，去 **System Settings → Privacy & Security → Accessibility** 撳着 Scene 就得。
 
-**或者直接下載 DMG**：**[Scene-0.7.3.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.3/Scene-0.7.3.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
+**或者直接下載 DMG**：**[Scene-0.7.4.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.4/Scene-0.7.4.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
 
 所有版本：[Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · 用 DMG 嘅話，跟住 [`docs/INSTALL.md`](docs/INSTALL.md) 做一次性嘅 Gatekeeper + Accessibility 授權步驟。
 
@@ -47,11 +47,13 @@ brew install --cask chifunghillmanchan/tap/scene
 
 ▶ [睇 30 秒示範片](docs/media/scene-marketing.mp4)（MP4，13 MB）
 
-## v0.7.3 嘅新功能
+## v0.7.4 嘅新功能
 
-**再撳同一個 layout，唔會再搞亂已經入位嘅 window** — Quads 開住四個 window，閂咗其中一個，再開另一個 app 然後再撳 Quads：仲喺自己 slot 度嘅三個 window 完全唔會動，只有新嗰個會移入去空出嚟嘅 slot。以前係全部按 z-order 重新排一次，所以改一樣嘢就搞到成個螢幕重新洗牌。拖過位換咗嘅 window 都會保住新位置。
+**Dock 唔會再拖住你個 layout 走** — 接多過一部 mon 嘅時候，Dock 會跟住你隻滑鼠跳，而 macOS 淨係喺 Dock 當下嗰部 mon 度留返位。Scene 就係排入呢個留返嘅範圍，所以你將 Dock 移去另一部 mon 再撳同一個 layout，全部 window 就會照 Dock 個高度郁一次同縮一次。而家 Scene 喺每一部 mon 都留返 Dock 嘅厚度，layout 嘅目標位置淨係睇你部部 mon 點擺 — 無論 Dock 遊咗去邊，再撳都唔會郁。代價：冇 Dock 嗰部 mon 都要留返嗰條位。如果你開咗 Dock 自動收埋，就完全冇代價；淨係得一部 mon 嘅話更加完全冇影響。仲有，泊喺 Dock 上面嘅 window 而家都會計入 layout，唔會再當睇唔到。
 
-**menu bar 個 menu 唔會撳一下就閂** — 撳 Free Mode、layout 或者 workspace 都唔會關掉個 menu，所以你可以熄咗 Free Mode 之後即刻撳 layout，一次搞完。checkmark 而家喺你眼前即時更新。撳出去外面、按 Escape、或者開 Settings 就會閂。Tests: 363 → 371。
+**menu bar 個 panel 會喺你撳咗嘅 layout 打剔** — 生效嗰個 layout 右邊會有個剔，個名會變粗體，唔使數 window 都知而家行緊邊個 layout。有冇打剔都好，hotkey 嘅鍵位都會對齊。
+
+**由好舊嘅版本更新，會一次過跳到最新** — Scene 以前問 GitHub 攞 `releases/latest`，聽落好似係「最新版本」，其實係「按個 tag 指住嗰個 commit 嘅日期排出嚟最近嗰個 release」。如果有個 hotfix 係由舊 commit 度切出嚟，呢個 endpoint 就會交返個已經被取代嘅 release 畀你 — 落後好多版嘅用家會收到舊版，裝完重開又收到下一版，一版一版咁爬。而家 Scene 攞成個 release list 返嚟自己揀最高版本，draft 同 prerelease 一律跳過。Tests: 371 → 394。
 
 完整版本歷史見 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -109,7 +111,7 @@ Xcode 揀 `SceneApp` scheme → ⌘R。App 以 menu bar extra 形式行（冇 Do
 ### Build distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.3    # 出 dist/Scene-0.7.3.dmg（universal + notarized）
+./scripts/build-dmg.sh 0.7.4    # 出 dist/Scene-0.7.4.dmg（universal + notarized）
 ```
 
 Build universal（arm64 + x86_64）binary，Developer ID sign，submit 去 Apple notary，pack 入 DMG 連 `Applications` drop shortcut。Apple Silicon 同 Intel Mac 用同一個 DMG。如果想 local iterate DMG layout，set `SKIP_NOTARY=1` 會 skip Apple notary submission，改用 ad-hoc sign。
