@@ -464,3 +464,28 @@ Manual smoke checklist for the URL scheme + AppIntents shipped in v0.7.
 - [ ] Workspace hotkey ⌘⌥1 still fires Coding.
 - [ ] Drag-swap still works after a layout fired by URL scheme.
 - [ ] Free Mode still pauses everything when toggled via menu bar (not just via URL).
+
+## V0.7.3 — Persistent menu panel + sticky re-apply
+
+### Panel behavior
+
+- [ ] Click the menu bar icon — a panel opens (not a native menu).
+- [ ] Toggle Free Mode — panel stays open, checkmark flips in place, icon swaps to the pause glyph; layout/workspace rows dim.
+- [ ] Toggle Free Mode off — panel still open, rows re-enable.
+- [ ] Click a layout — it applies, panel stays open.
+- [ ] Activate a workspace — activation runs, panel stays open, active mark updates in place.
+- [ ] Click the desktop or another app — panel closes.
+- [ ] Reopen, press Escape — panel closes.
+- [ ] Reopen, click Settings — panel closes, settings window opens.
+- [ ] Reopen the panel several times — it always reopens (no dead menu bar icon after dismissal).
+- [ ] ⌘, opens Settings and ⌘Q quits while the panel is open and focused.
+- [ ] With an update available: banner click closes the panel first, then the install alert appears.
+
+### Sticky re-apply
+
+- [ ] Apply Quads to 4 windows; re-click Quads — nothing moves.
+- [ ] Close one of the 4, open a new app window, re-click Quads — only the new window moves, into the freed slot.
+- [ ] Drag-swap two windows, re-click Quads — the swap is preserved.
+- [ ] With 4 placed plus 1 extra window, re-click Quads — the extra minimizes, the placed 4 are untouched.
+- [ ] Click a different layout — full remap by z-order (previous behavior).
+- [ ] Drag-swap and seam-resize still work immediately after a sticky re-apply (observers rebuilt from the new plan).

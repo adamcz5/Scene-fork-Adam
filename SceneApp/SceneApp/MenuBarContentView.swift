@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import SceneCore
 
 struct MenuBarContentView: View {
@@ -15,123 +16,196 @@ struct MenuBarContentView: View {
     @ObservedObject var workspaceStore: WorkspaceStoreViewModel
     @ObservedObject var layoutStore: LayoutStoreViewModel
 
+    /// Hosting NSWindow of the window-style panel, captured via
+    /// PanelWindowAccessor so actions can dismiss the panel explicitly
+    /// (update-banner alert, Settings, onboarding, Escape). Layout,
+    /// workspace, and Free Mode clicks deliberately do NOT dismiss —
+    /// that is the point of the window-style panel.
+    @State private var panelWindow: NSWindow?
+
     var body: some View {
-        if coordinator.permissionGranted {
-            grantedMenu
-        } else {
-            ungrantedMenu
+        Group {
+            if coordinator.permissionGranted {
+                grantedPanel
+            } else {
+                ungrantedPanel
+            }
         }
+        .frame(width: 280)
+        .background(PanelWindowAccessor(window: $panelWindow))
+        .onExitCommand { closePanel() }
     }
 
+    // MARK: - Granted
+
     @ViewBuilder
-    private var grantedMenu: some View {
+    private var grantedPanel: some View {
         // Touch layoutListVersion so SwiftUI rebuilds when LayoutStore mutates.
         let _ = coordinator.layoutListVersion
 
-        if let version = updateChecker.availableVersion,
-           let releaseURL = updateChecker.releasePageURL {
-            Button(action: { handleUpdateClick(version: version, releaseURL: releaseURL) }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .foregroundStyle(.tint)
-                    Text(String(format: String(localized: "menu.update.available"), version))
-                        .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: 2) {
+            if let version = updateChecker.availableVersion,
+               let releaseURL = updateChecker.releasePageURL {
+                Button(action: {
+                    // Close first — runModal over an open panel fights for focus.
+                    closePanel()
+                    handleUpdateClick(version: version, releaseURL: releaseURL)
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundStyle(.tint)
+                        Text(String(format: String(localized: "menu.update.available"), version))
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
                 }
+                .buttonStyle(MenuRowButtonStyle())
+                PanelDivider()
             }
-            Divider()
-        }
 
-        // MARK: - Workspaces (V0.4)
-
-        Section(header: Text("menu.section.workspaces")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        ) {
+            sectionHeader("menu.section.workspaces")
             if workspaceStore.workspaces.isEmpty {
                 Text("menu.workspaces.empty")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
             } else {
                 ForEach(workspaceStore.workspaces) { workspace in
-                    Button(action: { activate(workspace: workspace) }) {
-                        HStack(spacing: 6) {
-                            if workspaceStore.activeWorkspaceID == workspace.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            } else {
-                                Spacer().frame(width: 14)
-                            }
-                            if let layout = layoutStore.layouts.first(where: { $0.id == workspace.layoutID }) {
-                                LayoutThumbnail(layout: layout, size: CGSize(width: 24, height: 16))
-                            } else {
-                                Rectangle()
-                                    .fill(.red.opacity(0.3))
-                                    .frame(width: 24, height: 16)
-                            }
-                            Text(workspace.name)
-                                .fontWeight(
-                                    workspaceStore.activeWorkspaceID == workspace.id ? .semibold : .regular
-                                )
-                            Spacer()
-                            if let chord = workspace.hotkey {
-                                Text(chord.displayString)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .disabled(coordinator.freeMode)
+                    workspaceRow(workspace)
                 }
             }
-        }
 
-        Divider()
+            PanelDivider()
 
-        // MARK: - Layouts
+            ForEach(layoutStore.layouts) { layout in
+                layoutRow(layout)
+            }
 
-        ForEach(layoutStore.layouts) { layout in
-            Button {
-                coordinator.applyLayout(layout)
-            } label: {
-                HStack {
-                    LayoutThumbnail(layout: layout, size: CGSize(width: 24, height: 16))
-                        .padding(.trailing, 6)
-                    Text(label(for: layout))
+            PanelDivider()
+
+            Button(action: { coordinator.freeMode.toggle() }) {
+                HStack(spacing: 6) {
+                    checkmarkColumn(coordinator.freeMode)
+                    Text("menu.free_mode")
+                    Spacer()
                 }
             }
-            .disabled(coordinator.freeMode)
-        }
+            .buttonStyle(MenuRowButtonStyle())
 
-        Divider()
-        Button(action: { coordinator.freeMode.toggle() }) {
-            HStack {
-                if coordinator.freeMode {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.tint)
-                } else {
-                    Spacer().frame(width: 14)
-                }
-                Text("menu.free_mode")
+            PanelDivider()
+
+            Button(action: {
+                closePanel()
+                appDelegate.openSettings()
+            }) {
+                HStack { Text("menu.settings"); Spacer() }
             }
-        }
-        Divider()
-        Button("menu.settings") {
-            appDelegate.openSettings()
-        }
-        .keyboardShortcut(",")
-        Divider()
-        Button("menu.quit") { NSApp.terminate(nil) }
+            .buttonStyle(MenuRowButtonStyle())
+            .keyboardShortcut(",")
+
+            Button(action: { NSApp.terminate(nil) }) {
+                HStack { Text("menu.quit"); Spacer() }
+            }
+            .buttonStyle(MenuRowButtonStyle())
             .keyboardShortcut("q")
+        }
+        .padding(6)
     }
 
+    // MARK: - Ungranted
+
     @ViewBuilder
-    private var ungrantedMenu: some View {
-        Button("menu.grant_accessibility") {
-            coordinator.openOnboarding()
+    private var ungrantedPanel: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Button(action: {
+                closePanel()
+                coordinator.openOnboarding()
+            }) {
+                HStack { Text("menu.grant_accessibility"); Spacer() }
+            }
+            .buttonStyle(MenuRowButtonStyle())
+
+            PanelDivider()
+
+            Button(action: { NSApp.terminate(nil) }) {
+                HStack { Text("menu.quit"); Spacer() }
+            }
+            .buttonStyle(MenuRowButtonStyle())
         }
-        Divider()
-        Button("menu.quit") { NSApp.terminate(nil) }
+        .padding(6)
+    }
+
+    // MARK: - Rows
+
+    private func workspaceRow(_ workspace: Workspace) -> some View {
+        Button(action: { activate(workspace: workspace) }) {
+            HStack(spacing: 6) {
+                checkmarkColumn(workspaceStore.activeWorkspaceID == workspace.id)
+                if let layout = layoutStore.layouts.first(where: { $0.id == workspace.layoutID }) {
+                    LayoutThumbnail(layout: layout, size: CGSize(width: 24, height: 16))
+                } else {
+                    Rectangle()
+                        .fill(.red.opacity(0.3))
+                        .frame(width: 24, height: 16)
+                }
+                Text(workspace.name)
+                    .fontWeight(
+                        workspaceStore.activeWorkspaceID == workspace.id ? .semibold : .regular
+                    )
+                Spacer()
+                if let chord = workspace.hotkey {
+                    hotkeyLabel(chord.displayString)
+                }
+            }
+        }
+        .buttonStyle(MenuRowButtonStyle())
+        .disabled(coordinator.freeMode)
+    }
+
+    private func layoutRow(_ layout: CustomLayout) -> some View {
+        Button(action: { coordinator.applyLayout(layout) }) {
+            HStack(spacing: 6) {
+                LayoutThumbnail(layout: layout, size: CGSize(width: 24, height: 16))
+                Text(layout.name)
+                Spacer()
+                if let h = layout.hotkey {
+                    hotkeyLabel(h.displayString)
+                }
+            }
+        }
+        .buttonStyle(MenuRowButtonStyle())
+        .disabled(coordinator.freeMode)
+    }
+
+    // MARK: - Small pieces
+
+    @ViewBuilder
+    private func checkmarkColumn(_ on: Bool) -> some View {
+        if on {
+            Image(systemName: "checkmark")
+                .foregroundStyle(.tint)
+        } else {
+            Spacer().frame(width: 14)
+        }
+    }
+
+    private func hotkeyLabel(_ s: String) -> some View {
+        Text(s)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+    }
+
+    private func sectionHeader(_ key: LocalizedStringKey) -> some View {
+        Text(key)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+    }
+
+    private func closePanel() {
+        panelWindow?.orderOut(nil)
     }
 
     /// Confirmation flow before kicking off the in-app installer (V0.5.6).
@@ -174,11 +248,27 @@ struct MenuBarContentView: View {
             await coordinator.applyWorkspace(id: id)
         }
     }
+}
 
-    private func label(for layout: CustomLayout) -> String {
-        if let h = layout.hotkey {
-            return "\(layout.name)\t\(h.displayString)"
-        }
-        return layout.name
+/// Grabs the NSWindow hosting the panel content so actions can dismiss it.
+private struct PanelWindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { window = nsView.window }
+    }
+}
+
+private struct PanelDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.vertical, 4)
+            .padding(.horizontal, 4)
     }
 }

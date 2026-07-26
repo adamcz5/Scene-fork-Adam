@@ -19,7 +19,7 @@ struct SceneAppEntry: App {
         } label: {
             MenuBarLabel(coordinator: delegate.coordinator)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
     }
 }
 
