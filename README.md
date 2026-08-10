@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 Quarantine is stripped automatically — no "cannot be verified" prompt. On first launch, grant Accessibility in **System Settings → Privacy & Security → Accessibility**.
 
-**Or download the DMG directly**: **[Scene-0.7.4.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.4/Scene-0.7.4.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
+**Or download the DMG directly**: **[Scene-0.7.5.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.5/Scene-0.7.5.dmg)** (Universal: Apple Silicon + Intel, macOS 14+, notarized by Apple — no Gatekeeper prompt)
 
 All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · DMG users, see [`docs/INSTALL.md`](docs/INSTALL.md) for the one-time Gatekeeper + Accessibility-permission steps.
 
@@ -46,6 +46,12 @@ All versions: [Releases page](https://github.com/ChiFungHillmanChan/macbook-resi
 [![Scene Layouts editor — drag seams to design any tile shape](docs/media/scene-layouts.png)](docs/media/scene-marketing.mp4)
 
 ▶ [Watch the 30-second demo](docs/media/scene-marketing.mp4) (MP4, 13 MB)
+
+## What's new in v0.7.5
+
+**The Settings toolbar buttons are back on macOS 26 (Tahoe).** On the Layouts tab, **+**, **+ Custom**, delete, reset-to-default and **Restore Default Presets** were all missing; on Workspaces, **New**, **Duplicate** and **Delete** were missing. You could still edit the layouts you already had, but you couldn't create, duplicate or delete anything from Settings. The cause was the whole-window translucency added in v0.7.2: the frosted backdrop was an AppKit container that the SwiftUI view was nested *inside*, and a hosting controller only hands its toolbar to the window when it *is* the window's content — nested one level deeper, it hands over nothing. The backdrop is now a SwiftUI background layer, so the glass look is exactly the same and the buttons are back. macOS 14 and 15 were never affected. Thanks to [@nphxexp-create](https://github.com/nphxexp-create) for the report ([#4](https://github.com/ChiFungHillmanChan/macbook-resizer/issues/4)).
+
+For the full version history, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## What's new in v0.7.4
 
@@ -109,7 +115,7 @@ In Xcode, select the `SceneApp` scheme and press ⌘R. The app runs as a menu ba
 ### Build a distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.4    # produces dist/Scene-0.7.4.dmg (universal, notarized)
+./scripts/build-dmg.sh 0.7.5    # produces dist/Scene-0.7.5.dmg (universal, notarized)
 ```
 
 This builds a universal (arm64 + x86_64) binary, Developer ID-signs it, submits it to Apple for notarization, and packages it into a DMG with an `Applications` drop shortcut. Both Apple Silicon and Intel Macs install from the same DMG. Set `SKIP_NOTARY=1` for a local ad-hoc build that skips the Apple notary submission (useful while iterating on DMG layout).

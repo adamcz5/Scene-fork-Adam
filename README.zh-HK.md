@@ -37,7 +37,7 @@ brew install --cask chifunghillmanchan/tap/scene
 
 自動幫你清走 quarantine flag，唔會彈「cannot be verified」嘅 Gatekeeper 警告。首次開 Scene 嗰陣，去 **System Settings → Privacy & Security → Accessibility** 撳着 Scene 就得。
 
-**或者直接下載 DMG**：**[Scene-0.7.4.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.4/Scene-0.7.4.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
+**或者直接下載 DMG**：**[Scene-0.7.5.dmg](https://github.com/ChiFungHillmanChan/macbook-resizer/releases/download/v0.7.5/Scene-0.7.5.dmg)**（Universal：Apple Silicon + Intel，macOS 14+，Apple notarized — 唔會彈 Gatekeeper 警告）
 
 所有版本：[Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases) · 用 DMG 嘅話，跟住 [`docs/INSTALL.md`](docs/INSTALL.md) 做一次性嘅 Gatekeeper + Accessibility 授權步驟。
 
@@ -46,6 +46,12 @@ brew install --cask chifunghillmanchan/tap/scene
 [![Scene Layouts editor — 拖 seam 整任何形狀嘅 tile 排列](docs/media/scene-layouts.png)](docs/media/scene-marketing.mp4)
 
 ▶ [睇 30 秒示範片](docs/media/scene-marketing.mp4)（MP4，13 MB）
+
+## v0.7.5 嘅新功能
+
+**macOS 26（Tahoe）設定視窗嘅制返晒嚟。** Layouts 嗰版嘅 **+**、**+ Custom**、刪除、還原做預設同 **Restore Default Presets** 全部唔見咗；Workspaces 嗰版嘅 **New**、**Duplicate**、**Delete** 都係。你仲可以改返啲已經有嘅 layout，但係喺設定入面新增、複製、刪除通通做唔到。原因係 v0.7.2 加嘅成個窗透明效果：嗰層毛玻璃底係一個 AppKit container，而 SwiftUI 個 view 係揼咗入去入面 — 而 hosting controller 淨係喺佢自己就係個窗嘅內容嗰陣先會將 toolbar 交畀個窗，包多咗一層就乜都唔交。而家嗰層毛玻璃改咗做 SwiftUI 嘅背景圖層，所以塊玻璃樣一模一樣，啲制亦都返晒嚟。macOS 14 同 15 一直都冇事。多謝 [@nphxexp-create](https://github.com/nphxexp-create) 報料（[#4](https://github.com/ChiFungHillmanChan/macbook-resizer/issues/4)）。
+
+完整版本歷史見 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## v0.7.4 嘅新功能
 
@@ -111,7 +117,7 @@ Xcode 揀 `SceneApp` scheme → ⌘R。App 以 menu bar extra 形式行（冇 Do
 ### Build distributable DMG
 
 ```bash
-./scripts/build-dmg.sh 0.7.4    # 出 dist/Scene-0.7.4.dmg（universal + notarized）
+./scripts/build-dmg.sh 0.7.5    # 出 dist/Scene-0.7.5.dmg（universal + notarized）
 ```
 
 Build universal（arm64 + x86_64）binary，Developer ID sign，submit 去 Apple notary，pack 入 DMG 連 `Applications` drop shortcut。Apple Silicon 同 Intel Mac 用同一個 DMG。如果想 local iterate DMG layout，set `SKIP_NOTARY=1` 會 skip Apple notary submission，改用 ad-hoc sign。

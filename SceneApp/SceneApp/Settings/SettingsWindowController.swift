@@ -31,33 +31,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 .environmentObject(layoutVM)
                 .environmentObject(settingsVM)
                 .environmentObject(workspaceVM)
+                .modifier(WindowBackdrop())
         )
-        let window: NSWindow
-        if #available(macOS 26.0, *) {
-            // Whole-window translucency. SwiftUI's containerBackground(for:
-            // .window) does not bridge into a manually hosted NSWindow, so
-            // the material backdrop is an NSVisualEffectView underneath the
-            // hosting view; the SwiftUI layer keeps its backgrounds clear
-            // (see DetailTabChrome in SettingsRoot).
-            let effect = NSVisualEffectView()
-            effect.material = .underWindowBackground
-            effect.blendingMode = .behindWindow
-            effect.state = .followsWindowActiveState
-            let container = NSViewController()
-            container.view = effect
-            container.addChild(host)
-            effect.addSubview(host.view)
-            host.view.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                host.view.topAnchor.constraint(equalTo: effect.topAnchor),
-                host.view.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
-                host.view.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
-                host.view.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
-            ])
-            window = NSWindow(contentViewController: container)
-        } else {
-            window = NSWindow(contentViewController: host)
-        }
+        // The hosting controller MUST be the window's root `contentViewController`.
+        // `NSHostingController` only bridges its SwiftUI `.toolbar` content into
+        // `view.window.toolbar` when it owns the window's content; as a *child*
+        // view controller the bridge never happens and every toolbar button
+        // silently disappears (issue #4 — regressed v0.7.2 through v0.7.4, when
+        // the macOS 26 translucency backdrop was an NSVisualEffectView container
+        // VC wrapping this host). The backdrop is now a SwiftUI background layer
+        // instead, which keeps the toolbar bridge intact.
+        let window = NSWindow(contentViewController: host)
         window.setContentSize(NSSize(width: 760, height: 540))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.title = String(localized: "settings.window.title")
@@ -90,4 +74,32 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
     }
+}
+
+/// Whole-window translucency on macOS 26, applied as a SwiftUI background rather
+/// than an AppKit container view controller — see the toolbar-bridge note in
+/// `SettingsWindowController.init`. `SwiftUI.containerBackground(for: .window)`
+/// still does not bridge into a manually hosted `NSWindow`, so the material is
+/// an `NSVisualEffectView` behind the SwiftUI hierarchy, whose own backgrounds
+/// stay clear (see `DetailTabChrome` in `SettingsRoot`). No-op on macOS 14/15.
+private struct WindowBackdrop: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.background(VisualEffectBackdrop().ignoresSafeArea())
+        } else {
+            content
+        }
+    }
+}
+
+private struct VisualEffectBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .underWindowBackground
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
