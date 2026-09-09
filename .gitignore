@@ -1,0 +1,47 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+**/*.xcscmblueprint
+**/*.xccheckout
+
+# Build artifacts
+*.o
+*.a
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Release pipeline outputs
+/build/
+/dist/
+
+# Regenerable icon source (generate-icon.py writes this alongside the
+# asset-catalog copy; the one in Assets.xcassets is the canonical copy).
+/icon_1024x1024.png
+
+# AI / agent-session artifacts (local only — do not commit)
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.claude/
+.cursor/
+.aider*
+.roomodes
+docs/superpowers/
+docs/marketing/
+APPLE_DEVELOPER_SETUP*.md
+.superpowers/
+
+.env
+.env/*
+public/ 

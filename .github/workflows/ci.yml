@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch/PR makes the in-flight run redundant.
+# macOS runners are the scarcest resource here, so cancel rather than queue.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # `macos-14` entered deprecation on 2026-07-06 and is fully unsupported
+    # from 2026-11-02, so it is not an option even though the app's deployment
+    # target is macOS 14. `macos-26` ships Xcode 26.x, which matches the
+    # toolchain used locally — pinned rather than `macos-latest` so a runner
+    # image rollover can never silently change the compiler under us.
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build SceneCore
+        run: swift build
+
+      - name: Test SceneCore
+        run: swift test
+
+      # Catches breakage in the SceneApp layer, which `swift test` never sees:
+      # SceneCore is a standalone package and the Xcode target is where the
+      # AppKit/SwiftUI bridges (Coordinator, AXWindowLookup, WindowAnimator)
+      # actually get compiled.
+      #
+      # Signing is disabled outright: CI has no Developer ID in its keychain,
+      # and an unsigned Debug build is enough to prove the code compiles.
+      - name: Build SceneApp
+        run: |
+          xcodebuild \
+            -project SceneApp/SceneApp.xcodeproj \
+            -scheme SceneApp \
+            -configuration Debug \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build

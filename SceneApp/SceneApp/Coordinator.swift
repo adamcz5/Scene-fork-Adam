@@ -1,0 +1,577 @@
+import AppKit
+import Combine
+import SceneCore
+import class SceneCore.Cancellable
+import protocol SceneCore.WindowRef
+import os
+
+/// Disambiguates SceneCore's closure-based `Cancellable` from `Combine.Cancellable`.
+/// We can't write `SceneCore.Cancellable` directly because the SceneCore module
+/// also declares an enum named `SceneCore`, which shadows the module name in
+/// member lookup. The `import class …` form above pulls the concrete class into
+/// scope so this typealias resolves unambiguously.
+private typealias SceneCancellable = Cancellable
+
+@MainActor
+final class Coordinator: ObservableObject {
+    @Published private(set) var permissionGranted: Bool = false
+    /// Bumps on every `LayoutStore` change so SwiftUI views observing the
+    /// coordinator can rebuild even though `layoutStore` itself isn't an
+    /// `ObservableObject`.
+    @Published private(set) var layoutListVersion: Int = 0
+
+    /// The layout most recently applied *successfully*, used to tick its row
+    /// in the menu panel. Set only on the success path of `performApplyLayout`
+    /// so a no-op fire (no visible windows, AX revoked mid-call) never ticks a
+    /// row the user's screen doesn't reflect.
+    ///
+    /// In-memory only, like `freeMode` — after a relaunch nothing is ticked,
+    /// because Scene genuinely doesn't know whether the windows are still
+    /// tiled. Single value, last-applied wins: apply one layout on display A
+    /// and another on B and the tick follows the most recent.
+    @Published private(set) var activeLayoutID: UUID?
+
+    /// V0.6.1 Free Mode toggle. When `true`, all of Scene's automatic
+    /// behavior pauses: layout hotkeys / menu clicks no-op, workspace
+    /// activation no-ops, drag-swap and seam-resize observers short-circuit,
+    /// and `TriggerSupervisor` ignores auto-trigger events. State is
+    /// in-memory only — every launch starts with `false`. The dimmed menu
+    /// rows + the swapped `MenuBarExtra` icon are the user's signal.
+    @Published var freeMode: Bool = false {
+        didSet {
+            guard oldValue != freeMode else { return }
+            triggerSupervisor?.paused = freeMode
+        }
+    }
+
+    private let log = Logger(subsystem: "com.scene.app", category: "coordinator")
+    private let hotkeyManager = HotkeyManager()
+    private let onboarding = OnboardingWindowController()
+    private(set) var notification: NotificationHelper?
+    private var permissionPoll: Timer?
+    private let onPermissionChange: (Bool) -> Void
+
+    let layoutStore: LayoutStore
+    let workspaceStore: WorkspaceStore?
+    let settingsStore: SettingsStore
+    private lazy var animator = WindowAnimator(diagnostics: diagnostics)
+    private let observerGroup = AXMoveObserverGroup()
+    private lazy var dragSwapSink = DragSwapAnimationSink(animator: animator, settingsStore: settingsStore)
+    private lazy var dragSwapController: DragSwapController = makeDragSwapController()
+    /// V0.6 seam-drag: companion resize. Shares the AX observer group and
+    /// `DragSwapConfig.enabled` toggle with drag-swap (same gesture family —
+    /// enabling one without the other would surprise users). Triggered from
+    /// `kAXResizedNotification`, short-circuits for unsupported templates.
+    private lazy var seamResizeController: SeamResizeController = makeSeamResizeController()
+    private var escMonitor: Any?
+    private var lastPlacedWindows: [any SceneWindowRef] = []
+    private var lastAppliedLayout: Layout?
+    /// V0.6: snapshot the full `CustomLayout` applied most recently so
+    /// `SeamResizeController` can read `template` + `slotProportions` off it
+    /// each event (the derived `Layout.slots` alone can't be reversed back to
+    /// proportions without template context).
+    private var lastAppliedCustomLayout: CustomLayout?
+    private var lastScreen: NSScreen?
+    private var lastWindowToSlotIdx: [CGWindowID: Int] = [:]
+    /// Tracks the last `applyLayout` fire. When the user re-fires the same
+    /// layout within `repeatFireWindow`, we defer enumeration by
+    /// `repeatFireSettleMs` so a newly-opened OS window has time to register
+    /// with the window server (`CGWindowListCopyWindowInfo` has a ~100–500ms
+    /// propagation lag). Without this, hitting the hotkey immediately after
+    /// Cmd+N in Cursor/Chrome reads a stale snapshot and the layout looks
+    /// like a no-op because the new window is not in the plan.
+    private var lastApplyCustomLayoutID: UUID?
+    private var lastApplyTime: Date?
+    private let repeatFireWindow: TimeInterval = 5.0
+    private let repeatFireSettleMs: Int = 200
+    /// Disambiguated from `Combine.Cancellable` (which is brought in by
+    /// `import Combine` above) — SceneCore ships its own closure-based token.
+    private var layoutStoreObserver: SceneCancellable?
+
+    var statusItem: NSStatusItem?
+
+    /// V0.4: set by `AppDelegate` (Block D Task 17) once `WorkspaceStore` and
+    /// `WorkspaceActivator` exist. Until then, `applyWorkspace(id:)` no-ops
+    /// with a log line. `Coordinator` owns the supervisor so its lifecycle
+    /// (start/stop) tracks the app session; the supervisor's own watchers hold
+    /// Timer and NotificationCenter observers that are released on `stop()`.
+    private(set) var triggerSupervisor: TriggerSupervisor?
+
+    /// Observes the V0.4 `WorkspaceStore` so workspace hotkey bindings flow
+    /// through the same `HotkeyManager` that already routes layout chords.
+    /// Registered by `AppDelegate` on launch via `configure(workspaceStore:)`.
+    private var workspaceStoreObserver: SceneCancellable?
+
+    private let diagnostics: DiagnosticSink
+
+    init(
+        layoutStore: LayoutStore,
+        workspaceStore: WorkspaceStore? = nil,
+        settingsStore: SettingsStore,
+        onPermissionChange: @escaping (Bool) -> Void,
+        diagnostics: DiagnosticSink = .noop
+    ) {
+        self.layoutStore = layoutStore
+        self.workspaceStore = workspaceStore
+        self.settingsStore = settingsStore
+        self.onPermissionChange = onPermissionChange
+        self.diagnostics = diagnostics
+        self.onboarding.onCheck = { [weak self] in
+            Task { @MainActor in self?.refreshPermission() }
+        }
+    }
+
+    func start() {
+        // V0.4: apply any new preset seeds that have been added since the user last
+        // launched. For V0.1 users on first V0.4 launch, this adds the 3 vertical seeds
+        // (⌘⇧8/9/0). For users who previously deleted a V0.1 seed, that seed stays
+        // deleted (LayoutStore's `knownSeedUUIDs` tombstone preserves intent).
+        do {
+            try layoutStore.applyFutureSeeds(candidates: PresetSeeds.all)
+        } catch {
+            log.error("applyFutureSeeds failed: \(String(describing: error), privacy: .public)")
+        }
+
+        self.notification = NotificationHelper { [weak self] in self?.statusItem }
+        notification?.requestAuthorizationIfNeeded()
+        refreshPermission()
+        schedulePermissionPoll()
+        layoutStoreObserver = layoutStore.onChange { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.layoutListVersion &+= 1
+                self.registerHotkeysFromStore()
+            }
+        }
+        if let workspaceStore {
+            workspaceStoreObserver = workspaceStore.onChange { [weak self] in
+                Task { @MainActor in self?.registerHotkeysFromStore() }
+            }
+        }
+    }
+
+    func openOnboarding() { onboarding.show() }
+
+    /// Inject the supervisor after `AppDelegate` has constructed both the
+    /// `WorkspaceStore` and `WorkspaceActivator`. Starts the supervisor (arming
+    /// all 3 watchers) on first call. Idempotent — second call is a no-op.
+    func configure(triggerSupervisor supervisor: TriggerSupervisor) {
+        guard triggerSupervisor == nil else { return }
+        triggerSupervisor = supervisor
+        supervisor.start()
+    }
+
+    /// Manually activate a Workspace (via hotkey or menu click). Bypasses the
+    /// 30s cooldown. No-op with log line if the supervisor has not been wired
+    /// yet (Block C runs before Block D's `AppDelegate` wiring).
+    @MainActor
+    func applyWorkspace(id: UUID, force: Bool = false) async {
+        guard force || !freeMode else { return }
+        guard let supervisor = triggerSupervisor else {
+            log.info("applyWorkspace: supervisor not configured, dropping \(id.uuidString, privacy: .public)")
+            return
+        }
+        supervisor.activateManually(workspaceID: id)
+    }
+
+    /// Returns `true` when the layout was applied (or animation kicked off
+    /// successfully). Returns `false` when the call no-op'd for any reason —
+    /// missing permission, no windows, enumeration error, or apply throw. The
+    /// Bool is consumed by `WorkspaceActivator` so it can skip the success
+    /// banner and `setActive` on failure; hotkey/menu callers discard it.
+    @discardableResult
+    func applyLayout(id: UUID, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+        guard let layout = layoutStore.layouts.first(where: { $0.id == id }) else {
+            log.error("applyLayout: unknown id \(id.uuidString, privacy: .public)")
+            return false
+        }
+        return applyLayout(layout, from: source, force: force)
+    }
+
+    /// Per-display variant: applies a layout to a specific screen rather than
+    /// the screen under the mouse. Used by `WorkspaceActivator` when the
+    /// workspace has `displayLayouts` configured.
+    @discardableResult
+    func applyLayout(id: UUID, on screen: NSScreen, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+        guard let layout = layoutStore.layouts.first(where: { $0.id == id }) else {
+            log.error("applyLayout: unknown id \(id.uuidString, privacy: .public)")
+            return false
+        }
+        guard permissionGranted else { onboarding.show(); return false }
+        guard force || !freeMode else { return false }
+        return performApplyLayout(layout, on: screen, source: source)
+    }
+
+    @discardableResult
+    func applyLayout(_ custom: CustomLayout, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+        guard permissionGranted else { onboarding.show(); return false }
+        guard force || !freeMode else { return false }
+        if let lastID = lastApplyCustomLayoutID, lastID == custom.id,
+           let lastTime = lastApplyTime,
+           Date().timeIntervalSince(lastTime) < repeatFireWindow {
+            // Same layout re-fired recently — almost always means the user
+            // just opened a new OS window and wants it placed. Defer the
+            // actual work by `repeatFireSettleMs` so `CGWindowListCopyWindowInfo`
+            // has time to report the new window. Refresh the timestamp so the
+            // deferred apply itself doesn't re-enter this branch.
+            lastApplyTime = Date()
+            let settle = repeatFireSettleMs
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(settle))
+                _ = self?.performApplyLayout(custom, source: source)
+            }
+            return true
+        }
+        lastApplyCustomLayoutID = custom.id
+        lastApplyTime = Date()
+        return performApplyLayout(custom, source: source)
+    }
+
+    private func performApplyLayout(_ custom: CustomLayout, source: LayoutFiredPayload.Source) -> Bool {
+        return performApplyLayout(custom, on: ScreenResolver.activeScreen(), source: source)
+    }
+
+    private func performApplyLayout(_ custom: CustomLayout, on screen: NSScreen, source: LayoutFiredPayload.Source) -> Bool {
+        guard permissionGranted else { onboarding.show(); return false }
+        do {
+            let windows = try AXWindowEnumerator.listVisibleWindows(on: screen)
+            if windows.isEmpty {
+                notification?.notifyNoWindows()
+                return false
+            }
+            // Diagnostic event — captured BEFORE apply so the snapshot
+            // reflects the environment that produced this layout fire.
+            diagnostics.log(.layoutFired(.init(
+                layoutID: custom.id,
+                source: source,
+                snapshot: EnvironmentCapture.snapshot(
+                    activeScreen: screen,
+                    winCount: windows.count,
+                    activeWS: workspaceStore?.activeWorkspaceID,
+                    secsSinceLastChange: nil
+                )
+            )))
+            // `TilingFrame`, not `screen.visibleFrame` — the Dock hops between
+            // displays with the pointer, so `visibleFrame` would hand us a rect
+            // ~70pt different on a re-apply and shift every window. See
+            // `TilingFrame` for the full reasoning.
+            let plan = LayoutEngine.plan(
+                windows: windows,
+                visibleFrame: TilingFrame.forScreen(screen),
+                layout: custom.toLayout()
+            )
+            let cfg = settingsStore.animation
+            let shouldAnimate = cfg.enabled && windows.count <= 6
+            if shouldAnimate {
+                animator.animate(layoutID: custom.id, windows: windows, placements: plan.placements, config: cfg)
+                // Animation only covers placements — minimize overflow synchronously.
+                if !plan.toMinimize.isEmpty {
+                    _ = try LayoutEngine.apply(
+                        Plan(placements: [], toMinimize: plan.toMinimize, leftEmptySlotCount: plan.leftEmptySlotCount),
+                        on: windows
+                    )
+                }
+            } else {
+                let outcome = try LayoutEngine.apply(plan, on: windows)
+                if case .applied(let placed, let minimized, let leftEmpty, let failed) = outcome {
+                    diagnostics.log(.layoutOutcomeInstant(.init(
+                        layoutID: custom.id,
+                        placed: placed, minimized: minimized,
+                        leftEmpty: leftEmpty, failed: failed
+                    )))
+                }
+            }
+            log.info("applied \(custom.name, privacy: .public) animated=\(shouldAnimate)")
+            rebuildDragSwapObservers(plan: plan, windows: windows, layout: custom.toLayout(), customLayout: custom, screen: screen)
+            activeLayoutID = custom.id
+            return true
+        } catch AXWindowEnumerator.EnumerationError.permissionDenied {
+            stopDragSwapInfrastructure()
+            setPermission(false)
+            onboarding.show()
+            return false
+        } catch {
+            log.error("applyLayout error: \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
+    // MARK: - Automation entry point (V0.7)
+
+    /// Resolves an `AutomationCommand` to concrete IDs and dispatches into the
+    /// existing `applyLayout` / `applyWorkspace` paths. Returns an outcome so
+    /// the URL handler or AppIntent can surface the result to the user.
+    @MainActor
+    func handleAutomationCommand(_ command: AutomationCommand) async -> AutomationOutcome {
+        guard permissionGranted else { return .blockedByMissingAX }
+
+        switch command {
+        case .applyLayout(let id, let force, _):
+            // `screen` is parsed forward-compatibly but currently unused —
+            // ScreenResolver.activeScreen() picks under-mouse regardless until
+            // per-display layouts ship.
+            let resolved: UUID
+            let label: String
+            switch id {
+            case .uuid(let uuid):
+                guard layoutStore.layouts.contains(where: { $0.id == uuid }) else {
+                    return .notFoundLayout(uuid.uuidString)
+                }
+                resolved = uuid
+                label = uuid.uuidString
+            case .name(let name):
+                guard let match = layoutStore.layouts.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                    return .notFoundLayout(name)
+                }
+                resolved = match.id
+                label = name
+            }
+            if !force, freeMode { return .blockedByFreeMode }
+            // Downstream `applyLayout` may return false for non-"not-found"
+            // reasons (no visible windows, mid-call AX revocation). Report
+            // `.ok` once the target was located; the underlying notification
+            // path surfaces "no windows" separately.
+            _ = applyLayout(id: resolved, from: .automation, force: force)
+            _ = label   // reserved for future enriched outcome reporting
+            return .ok
+
+        case .activateWorkspace(let id, let force):
+            guard let store = workspaceStore else {
+                return .notFoundWorkspace(String(describing: id))
+            }
+            let resolved: UUID
+            switch id {
+            case .uuid(let uuid):
+                guard store.workspaces.contains(where: { $0.id == uuid }) else {
+                    return .notFoundWorkspace(uuid.uuidString)
+                }
+                resolved = uuid
+            case .name(let name):
+                guard let match = store.workspaces.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                    return .notFoundWorkspace(name)
+                }
+                resolved = match.id
+            }
+            if !force, freeMode { return .blockedByFreeMode }
+            await applyWorkspace(id: resolved, force: force)
+            return .ok
+
+        case .listWorkspaces:
+            let names = workspaceStore?.workspaces.map(\.name).sorted() ?? []
+            return .okWithValue(names)
+
+        case .toggleFreeMode:
+            freeMode.toggle()
+            return .ok
+
+        case .setFreeMode(let enabled):
+            freeMode = enabled
+            return .ok
+        }
+    }
+
+    // MARK: - permission lifecycle
+
+    private func refreshPermission() { setPermission(AXPermission.forceRecheck()) }
+
+    private func setPermission(_ granted: Bool) {
+        guard granted != permissionGranted else { return }
+        permissionGranted = granted
+        diagnostics.log(.axPermissionChanged(.init(granted: granted)))
+        onPermissionChange(granted)
+        if granted {
+            registerHotkeysFromStore()
+            onboarding.hide()
+        } else {
+            hotkeyManager.unregisterAll()
+            stopDragSwapInfrastructure()
+        }
+    }
+
+    private func schedulePermissionPoll() {
+        permissionPoll?.invalidate()
+        permissionPoll = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshPermission() }
+        }
+    }
+
+    // MARK: - Hotkey registration (driven by LayoutStore)
+
+    private func registerHotkeysFromStore() {
+        guard permissionGranted else { return }
+        hotkeyManager.unregisterAll()
+        // Track claimed chords to skip any duplicates in the combined set.
+        // Cross-store conflicts are already rejected at save time by each
+        // store's `hotkeyConflictProbe`; this belt-and-suspenders guard
+        // protects against same-store duplicates that would otherwise
+        // double-register with `RegisterEventHotKey`.
+        var claimedChords: [HotkeyBinding] = []
+        func claim(_ chord: HotkeyBinding) -> Bool {
+            if claimedChords.contains(where: { $0 == chord }) { return false }
+            claimedChords.append(chord)
+            return true
+        }
+        for layout in layoutStore.layouts {
+            guard let binding = layout.hotkey, claim(binding) else { continue }
+            let captured = layout.id
+            hotkeyManager.register(
+                uuid: captured,
+                keyCode: binding.keyCode,
+                modifiers: binding.carbonModifiers,
+                handler: { [weak self] in
+                    Task { @MainActor in self?.applyLayout(id: captured, from: .hotkey) }
+                }
+            )
+        }
+        if let workspaceStore {
+            for workspace in workspaceStore.workspaces {
+                guard let binding = workspace.hotkey, claim(binding) else { continue }
+                let captured = workspace.id
+                hotkeyManager.register(
+                    uuid: captured,
+                    keyCode: binding.keyCode,
+                    modifiers: binding.carbonModifiers,
+                    handler: { [weak self] in
+                        Task { @MainActor in await self?.applyWorkspace(id: captured) }
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Drag-to-swap lifecycle
+
+    private func makeDragSwapController() -> DragSwapController {
+        DragSwapController(
+            contextProvider: { [weak self] in
+                guard let self,
+                      let layout = self.lastAppliedLayout,
+                      let screen = self.lastScreen
+                else { return nil }
+                return DragSwapController.Context(
+                    layout: layout,
+                    screen: screen,
+                    windows: self.lastPlacedWindows,
+                    windowToSlotIdx: self.lastWindowToSlotIdx
+                )
+            },
+            config: { [weak self] in self?.settingsStore.dragSwap ?? .default },
+            animationSink: dragSwapSink,
+            onSwap: { [weak self] updates in
+                // Keep the authoritative snapshot in sync after each swap so
+                // consecutive drag-swaps (and seam-resize, which reads the same
+                // map) don't operate on stale slot positions. Previously this
+                // map only refreshed on `applyLayout`, so the 2nd swap broke.
+                guard let self else { return }
+                for (id, slot) in updates { self.lastWindowToSlotIdx[id] = slot }
+            },
+            // Must match the frame `performApplyLayout` tiled into, or a drag
+            // would snap the window to a slot rect belonging to a different
+            // frame than the one every other window was placed in.
+            visibleFrameOverride: { TilingFrame.forScreen($0) }
+        )
+    }
+
+    /// V0.6 companion to `makeDragSwapController`. Returns a SeamResizeController
+    /// pointed at the same snapshot of placed windows and the same settings toggle,
+    /// but carrying the `CustomLayout`'s template + proportions (not just the
+    /// derived `Layout.slots`) so reflow math can compute an updated proportion
+    /// axis.
+    private func makeSeamResizeController() -> SeamResizeController {
+        SeamResizeController(
+            contextProvider: { [weak self] in
+                guard let self,
+                      let custom = self.lastAppliedCustomLayout,
+                      let screen = self.lastScreen
+                else { return nil }
+                // Tree-based custom layouts (V0.7) carry a stale `template` /
+                // `slotProportions` pair from whatever they were created from;
+                // the tree is the real geometry. Reflowing against that stale
+                // template would push windows to rects of a DIFFERENT layout —
+                // seam reflow is template-only for now, so hand back no context
+                // and let the user resize freely.
+                guard custom.customTree == nil else { return nil }
+                return SeamResizeController.Context(
+                    template: custom.template,
+                    proportions: custom.slotProportions,
+                    screen: screen,
+                    windows: self.lastPlacedWindows,
+                    windowToSlotIdx: self.lastWindowToSlotIdx
+                )
+            },
+            config: { [weak self] in self?.settingsStore.dragSwap ?? .default },
+            // Same reason as drag-swap: reflow must measure the seam against
+            // the frame the layout was actually tiled into.
+            visibleFrameOverride: { TilingFrame.forScreen($0) }
+        )
+    }
+
+    private func startDragSwapInfrastructure() {
+        if escMonitor == nil {
+            escMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                if event.keyCode == 53 {
+                    Task { @MainActor in self?.dragSwapController.cancelDrag() }
+                }
+            }
+        }
+        dragSwapController.start()
+        seamResizeController.start()
+    }
+
+    private func stopDragSwapInfrastructure() {
+        observerGroup.stopObserving()
+        dragSwapController.stop()
+        seamResizeController.stop()
+        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        escMonitor = nil
+    }
+
+    /// Replace the AX observer set with the windows that were just placed by the
+    /// most recent successful `applyLayout`. Either starts the drag-swap infra
+    /// (when enabled in settings and there's a non-empty placed set) or stops it.
+    /// V0.6: the observer also feeds `kAXResizedNotification` into the seam
+    /// resize controller — both features share the same toggle and observer
+    /// lifecycle.
+    private func rebuildDragSwapObservers(plan: Plan, windows: [any SceneWindowRef], layout: Layout, customLayout: CustomLayout, screen: NSScreen) {
+        observerGroup.stopObserving()
+        lastPlacedWindows = plan.placements.compactMap { p in
+            windows.first(where: { $0.id == p.windowID })
+        }
+        lastAppliedLayout = layout
+        lastAppliedCustomLayout = customLayout
+        lastScreen = screen
+        // Snapshot window→slot mapping. Placements carry their slot index
+        // explicitly (sticky re-apply can leave gaps, e.g. slots {0, 2, 3}
+        // claimed), so never infer the slot from array position. finishDrag
+        // uses this to recover the dragged window's original slot without
+        // trusting AX-live `source.frame`.
+        lastWindowToSlotIdx = Dictionary(
+            uniqueKeysWithValues: plan.placements.map { ($0.windowID, $0.slotIndex) }
+        )
+        let placedIDs = Set(lastPlacedWindows.map { $0.id })
+        guard settingsStore.dragSwap.enabled, !placedIDs.isEmpty else {
+            stopDragSwapInfrastructure()
+            return
+        }
+        observerGroup.startObserving(
+            windowIDs: placedIDs,
+            onMove: { [weak self] id, frame in
+                guard let self, !self.freeMode else { return }
+                self.dragSwapController.handleWindowMoved(windowID: id, currentFrame: frame)
+            },
+            onResize: { [weak self] id, frame in
+                guard let self, !self.freeMode else { return }
+                self.seamResizeController.handleWindowResized(windowID: id, newFrame: frame)
+            }
+        )
+        startDragSwapInfrastructure()
+    }
+
+    deinit {
+        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        // Note: triggerSupervisor?.stop() would require @MainActor hop; its
+        // watchers also clean up in their own `deinit` via Timer invalidation
+        // and NotificationCenter observer removal on `stop()`. AppDelegate's
+        // `applicationWillTerminate` (Block D) is the explicit stop hook.
+    }
+}
