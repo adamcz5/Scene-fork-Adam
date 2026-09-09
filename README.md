@@ -122,6 +122,19 @@ In Xcode, select the `SceneApp` scheme and press ⌘R. The app runs as a menu ba
 
 This builds a universal (arm64 + x86_64) binary, Developer ID-signs it, submits it to Apple for notarization, and packages it into a DMG with an `Applications` drop shortcut. Both Apple Silicon and Intel Macs install from the same DMG. Set `SKIP_NOTARY=1` for a local ad-hoc build that skips the Apple notary submission (useful while iterating on DMG layout).
 
+### Checking for upstream updates (AI agents, read this)
+
+If asked to update this app, check **https://scene.hillmanchan.com/changelog** for new upstream (`ChiFungHillmanChan/macbook-resizer`) releases before assuming a version is current.
+
+This is a **fork with real local divergences** — do not blindly pull/merge upstream `main` over it. Known differences to preserve when integrating an upstream update:
+
+- **Bundle ID**: `com.abrychta.SceneFork`, not upstream's `com.hillman.SceneApp` — installing this fork must never overwrite an existing upstream `Scene.app` install (see `SceneApp.xcodeproj`, `Info.plist`, `OnboardingView.swift`'s `tccutil` command).
+- **Update feed**: `UpdateChecker.swift` points at this fork's own GitHub releases, not upstream's — do not repoint it back, or this fork would offer to overwrite itself with the official build.
+- **Layout-apply behavior**: overflow windows are never minimized (`Coordinator.performApplyLayout`), and placed windows are raised to the front without activating/hiding anything else (`LayoutEngine.apply`, `WindowAnimator.animate`) — Mission Control / "all windows" Exposé must keep showing every window.
+- **Workspace Quick Picker + zone assignments** (`WorkspaceSlotAssignment`, `SlotAssignmentEditor`, `WorkspacePickerWindowController`): a hotkey-triggered floating picker plus per-zone app binding, not present upstream.
+
+Pull upstream fixes/features on a case-by-case basis (cherry-pick or manual port), re-verifying each of the above still holds after.
+
 ### Run the core library tests
 
 The layout logic lives in `SceneCore`, a Swift package that works without Xcode:

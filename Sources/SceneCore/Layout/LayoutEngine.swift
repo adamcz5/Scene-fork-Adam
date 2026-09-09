@@ -8,32 +8,55 @@ public enum LayoutEngine {
     /// windows fill the remaining slots in z-order; leftovers get minimized.
     /// A sticky window's placement targets the slot's exact rect, so
     /// sub-tolerance drift self-heals on re-apply.
+    ///
+    /// `assignments` (from `Workspace.slotAssignments`) run first and win over
+    /// both the sticky and fill passes — each claims the first unclaimed
+    /// window matching its `bundleID` (and `titleContains`, if set) for its
+    /// `slotIndex`. Empty `assignments` (the default) makes this identical to
+    /// the pre-assignment behavior.
     public static func plan(
         windows: [any WindowRef],
         visibleFrame: CGRect,
         layout: Layout,
+        assignments: [WorkspaceSlotAssignment] = [],
         stickyTolerance: CGFloat = 10
     ) -> Plan {
         let slotRects = layout.slots.map { $0.absoluteRect(in: visibleFrame) }
 
-        // Sticky pass — z-order priority when two windows sit on the same rect.
         var slotToWindow: [Int: any WindowRef] = [:]
-        var stickyIDs = Set<CGWindowID>()
-        for window in windows {
+        var claimedIDs = Set<CGWindowID>()
+
+        // Assigned pass — explicit app→zone bindings win first.
+        for assignment in assignments {
+            guard assignment.slotIndex >= 0, assignment.slotIndex < slotRects.count,
+                  slotToWindow[assignment.slotIndex] == nil else { continue }
+            guard let window = windows.first(where: { w in
+                !claimedIDs.contains(w.id) &&
+                w.bundleID == assignment.bundleID &&
+                (assignment.titleContains.map { hint in
+                    !hint.isEmpty && (w.title?.range(of: hint, options: .caseInsensitive) != nil)
+                } ?? true)
+            }) else { continue }
+            slotToWindow[assignment.slotIndex] = window
+            claimedIDs.insert(window.id)
+        }
+
+        // Sticky pass — z-order priority when two windows sit on the same rect.
+        for window in windows where !claimedIDs.contains(window.id) {
             let claimed = slotRects.indices.first { idx in
                 slotToWindow[idx] == nil &&
                 rectsApproxEqual(window.frame, slotRects[idx], tolerance: stickyTolerance)
             }
             if let idx = claimed {
                 slotToWindow[idx] = window
-                stickyIDs.insert(window.id)
+                claimedIDs.insert(window.id)
             }
         }
 
         // Fill pass — remaining windows (z-order) into remaining slots (index order).
         var overflow: [CGWindowID] = []
         var freeSlots = slotRects.indices.filter { slotToWindow[$0] == nil }[...]
-        for window in windows where !stickyIDs.contains(window.id) {
+        for window in windows where !claimedIDs.contains(window.id) {
             if let idx = freeSlots.popFirst() {
                 slotToWindow[idx] = window
             } else {
@@ -79,6 +102,14 @@ extension LayoutEngine {
             }
             do {
                 try applyFrameWithCorrection(p.targetFrame, to: window, tolerance: electronTolerancePx)
+                // Best-effort: bring the placed window to the front of the
+                // z-order so the layout you just applied is actually visible
+                // instead of buried behind whatever was on top. Ordering-only
+                // — nothing else is hidden/minimized/activated, so Mission
+                // Control's "all windows" view is unaffected. A raise failure
+                // (e.g. app doesn't support the AX action) doesn't fail the
+                // placement itself; the window is still correctly positioned.
+                try? window.raise()
                 placed += 1
             } catch {
                 layoutEngineLog.error("setFrame failed for \(window.bundleID ?? "unknown", privacy: .public): \(String(describing: error), privacy: .public)")

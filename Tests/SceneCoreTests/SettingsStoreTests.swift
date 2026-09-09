@@ -114,7 +114,7 @@ extension SettingsStoreTests {
         XCTAssertTrue(store.diagnosticsEnabled, "V2 → V3 migration defaults diagnosticsEnabled = true")
         let raw = try Data(contentsOf: fileURL)
         let rewritten = String(data: raw, encoding: .utf8) ?? ""
-        XCTAssertTrue(rewritten.contains("\"version\" : 3"))
+        XCTAssertTrue(rewritten.contains("\"version\" : \(SettingsStore.currentVersion)"))
         XCTAssertTrue(rewritten.contains("diagnosticsEnabled"))
     }
 
@@ -129,6 +129,35 @@ extension SettingsStoreTests {
         let reopened = try SettingsStore(fileURL: fileURL)
         XCTAssertFalse(reopened.diagnosticsEnabled)
         token.cancel()
+    }
+
+    // MARK: - V0.8 Quick Picker hotkey
+
+    func testV3FileMigratesToV4WithNilQuickPickerHotkey() throws {
+        // Simulate a pre-Quick-Picker settings file (version 3, no
+        // quickPickerHotkey field).
+        let v3json = #"""
+        {"version":3,"animation":{"enabled":true,"durationMs":250,"easing":"easeOut"},"dragSwap":{"enabled":true,"distanceThresholdPt":40},"diagnosticsEnabled":true}
+        """#.data(using: .utf8)!
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try v3json.write(to: fileURL)
+        let store = try SettingsStore(fileURL: fileURL)
+        XCTAssertNil(store.quickPickerHotkey, "V3 → V4 migration defaults quickPickerHotkey = nil")
+        let raw = try Data(contentsOf: fileURL)
+        let rewritten = String(data: raw, encoding: .utf8) ?? ""
+        XCTAssertTrue(rewritten.contains("\"version\" : \(SettingsStore.currentVersion)"))
+    }
+
+    func testSetQuickPickerHotkeyPersistsAndReloads() throws {
+        let store = try SettingsStore(fileURL: fileURL)
+        let binding = HotkeyBinding(keyCode: 49, modifiers: [.command, .shift])
+        try store.setQuickPickerHotkey(binding)
+        XCTAssertEqual(store.quickPickerHotkey, binding)
+
+        let reloaded = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(reloaded.quickPickerHotkey, binding)
     }
 
     func testDragSwapOnChangeFires() throws {

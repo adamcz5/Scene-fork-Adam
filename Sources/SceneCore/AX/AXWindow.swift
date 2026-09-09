@@ -36,6 +36,10 @@ public final class AXWindow: WindowRef {
         (axAttribute("AXFullScreen") as? Bool) ?? false
     }
 
+    public var title: String? {
+        axAttribute(kAXTitleAttribute) as? String
+    }
+
     /// Writes `rect` to the window, interpreting it in **NS coordinates**
     /// (same system as `NSScreen.frame`). This is the only AX write boundary
     /// in the codebase, so we do the NS→AX vertical flip exactly once, here.
@@ -48,6 +52,11 @@ public final class AXWindow: WindowRef {
     public func minimize() throws {
         let result = AXUIElementSetAttributeValue(element, kAXMinimizedAttribute as CFString, true as CFTypeRef)
         try throwIfFailed(result, op: "minimize")
+    }
+
+    public func raise() throws {
+        let result = AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+        try throwIfFailed(result, op: "raise")
     }
 
     public var axElement: AXUIElement { element }

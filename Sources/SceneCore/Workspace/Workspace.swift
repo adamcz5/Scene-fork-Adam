@@ -46,6 +46,16 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
     /// `layoutID` to the screen under the mouse. Screens not listed here fall
     /// back to `layoutID`.
     public var displayLayouts: [DisplayLayoutAssignment]
+    /// Explicit app→zone bindings for this Workspace's layout (see
+    /// `WorkspaceSlotAssignment`). Empty means "no explicit assignment" —
+    /// `LayoutEngine.plan` falls back to its existing sticky + z-order fill
+    /// for every zone, exactly as before this field existed.
+    public var slotAssignments: [WorkspaceSlotAssignment]
+    /// Whether this Workspace appears as a tile in the hotkey-triggered
+    /// Workspace Quick Picker. Defaults to `true` so existing/new Workspaces
+    /// show up without extra setup; users hide ones they don't want cluttering
+    /// the picker from the Workspace editor.
+    public var showInQuickPicker: Bool
     public var isPresetSeed: Bool
     public var isModified: Bool
 
@@ -62,6 +72,8 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         hotkey: HotkeyBinding? = nil,
         triggers: [WorkspaceTrigger] = [],
         displayLayouts: [DisplayLayoutAssignment] = [],
+        slotAssignments: [WorkspaceSlotAssignment] = [],
+        showInQuickPicker: Bool = true,
         isPresetSeed: Bool = false,
         isModified: Bool = false
     ) {
@@ -77,6 +89,8 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         self.hotkey = hotkey
         self.triggers = triggers
         self.displayLayouts = displayLayouts
+        self.slotAssignments = slotAssignments
+        self.showInQuickPicker = showInQuickPicker
         self.isPresetSeed = isPresetSeed
         self.isModified = isModified
     }
@@ -101,6 +115,8 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         case hotkey
         case triggers
         case displayLayouts
+        case slotAssignments
+        case showInQuickPicker
         case isPresetSeed
         case isModified
     }
@@ -125,6 +141,11 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
             [DisplayLayoutAssignment].self,
             forKey: .displayLayouts
         ) ?? []
+        self.slotAssignments = try c.decodeIfPresent(
+            [WorkspaceSlotAssignment].self,
+            forKey: .slotAssignments
+        ) ?? []
+        self.showInQuickPicker = try c.decodeIfPresent(Bool.self, forKey: .showInQuickPicker) ?? true
         self.isPresetSeed = try c.decodeIfPresent(Bool.self, forKey: .isPresetSeed) ?? false
         self.isModified = try c.decodeIfPresent(Bool.self, forKey: .isModified) ?? false
     }
@@ -143,6 +164,8 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         try c.encodeIfPresent(hotkey, forKey: .hotkey)
         try c.encode(triggers, forKey: .triggers)
         try c.encode(displayLayouts, forKey: .displayLayouts)
+        try c.encode(slotAssignments, forKey: .slotAssignments)
+        try c.encode(showInQuickPicker, forKey: .showInQuickPicker)
         try c.encode(isPresetSeed, forKey: .isPresetSeed)
         try c.encode(isModified, forKey: .isModified)
     }

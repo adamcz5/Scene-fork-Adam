@@ -13,24 +13,31 @@ public final class SettingsStore {
     /// toggle lets them opt out (which drains the writer + deletes the
     /// `diagnostics/` directory).
     public private(set) var diagnosticsEnabled: Bool
+    /// Global hotkey that opens the Workspace Quick Picker (a floating panel
+    /// listing Workspaces with `showInQuickPicker == true`, click-to-activate).
+    /// `nil` (default) means the picker has no hotkey yet — the user records
+    /// one in Settings → Hotkeys.
+    public private(set) var quickPickerHotkey: HotkeyBinding?
     private let fileURL: URL
     private var observers: [UUID: () -> Void] = [:]
 
-    public static let currentVersion = 3
+    public static let currentVersion = 4
 
     public init(fileURL: URL) throws {
         self.fileURL = fileURL
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
-            let (animation, dragSwap, diagnosticsEnabled, needsRewrite) = try Self.decodeWithMigration(data: data)
+            let (animation, dragSwap, diagnosticsEnabled, quickPickerHotkey, needsRewrite) = try Self.decodeWithMigration(data: data)
             self.animation = animation
             self.dragSwap = dragSwap
             self.diagnosticsEnabled = diagnosticsEnabled
+            self.quickPickerHotkey = quickPickerHotkey
             if needsRewrite { try persist() }
         } else {
             self.animation = .default
             self.dragSwap = .default
             self.diagnosticsEnabled = true
+            self.quickPickerHotkey = nil
             try persist()
         }
     }
@@ -53,6 +60,12 @@ public final class SettingsStore {
         for h in observers.values { h() }
     }
 
+    public func setQuickPickerHotkey(_ binding: HotkeyBinding?) throws {
+        quickPickerHotkey = binding
+        try persist()
+        for h in observers.values { h() }
+    }
+
     public func onChange(_ handler: @escaping () -> Void) -> Cancellable {
         let token = UUID()
         observers[token] = handler
@@ -64,7 +77,8 @@ public final class SettingsStore {
             version: Self.currentVersion,
             animation: animation,
             dragSwap: dragSwap,
-            diagnosticsEnabled: diagnosticsEnabled
+            diagnosticsEnabled: diagnosticsEnabled,
+            quickPickerHotkey: quickPickerHotkey
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -78,20 +92,23 @@ public final class SettingsStore {
 
     /// Decodes whatever schema version is on disk; returns `needsRewrite=true`
     /// if the file must be upgraded and persisted back.
-    private static func decodeWithMigration(data: Data) throws -> (AnimationConfig, DragSwapConfig, Bool, Bool) {
+    private static func decodeWithMigration(data: Data) throws -> (AnimationConfig, DragSwapConfig, Bool, HotkeyBinding?, Bool) {
         let versionProbe = try JSONDecoder().decode(VersionProbe.self, from: data)
         switch versionProbe.version {
+        case 4:
+            let v4 = try JSONDecoder().decode(StoredFile.self, from: data)
+            return (v4.animation, v4.dragSwap, v4.diagnosticsEnabled, v4.quickPickerHotkey, false)
         case 3:
-            let v3 = try JSONDecoder().decode(StoredFile.self, from: data)
-            return (v3.animation, v3.dragSwap, v3.diagnosticsEnabled, false)
+            let v3 = try JSONDecoder().decode(StoredFileV3.self, from: data)
+            return (v3.animation, v3.dragSwap, v3.diagnosticsEnabled, nil, true)
         case 2:
             let v2 = try JSONDecoder().decode(StoredFileV2.self, from: data)
             // Default V0.6 diagnostics ON for upgraded users — they can
             // still opt out via the AboutTab toggle.
-            return (v2.animation, v2.dragSwap, true, true)
+            return (v2.animation, v2.dragSwap, true, nil, true)
         case 1:
             let v1 = try JSONDecoder().decode(StoredFileV1.self, from: data)
-            return (v1.animation, .default, true, true)
+            return (v1.animation, .default, true, nil, true)
         default:
             throw DecodingError.dataCorrupted(.init(
                 codingPath: [],
@@ -103,6 +120,14 @@ public final class SettingsStore {
     private struct VersionProbe: Codable { let version: Int }
 
     private struct StoredFile: Codable {
+        let version: Int
+        let animation: AnimationConfig
+        let dragSwap: DragSwapConfig
+        let diagnosticsEnabled: Bool
+        let quickPickerHotkey: HotkeyBinding?
+    }
+
+    private struct StoredFileV3: Codable {
         let version: Int
         let animation: AnimationConfig
         let dragSwap: DragSwapConfig

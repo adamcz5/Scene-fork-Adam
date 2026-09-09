@@ -77,6 +77,49 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertEqual(decoded.appsToLaunch, ["com.apple.Safari"])
     }
 
+    func testLegacyWorkspaceDecodesWithSlotAssignmentDefaults() throws {
+        // Pre-Quick-Picker JSON: no slotAssignments, no showInQuickPicker.
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Legacy",
+          "layoutID": "22222222-2222-2222-2222-222222222222",
+          "appsToLaunch": [],
+          "appsToQuit": [],
+          "focusMode": null,
+          "hotkey": null,
+          "triggers": [],
+          "isPresetSeed": false,
+          "isModified": false
+        }
+        """
+        let decoded = try JSONDecoder().decode(Workspace.self, from: Data(json.utf8))
+        XCTAssertTrue(decoded.slotAssignments.isEmpty)
+        XCTAssertTrue(decoded.showInQuickPicker, "existing Workspaces should keep showing in the picker")
+    }
+
+    func testSlotAssignmentsAndQuickPickerFlagRoundTrip() throws {
+        let assignment = WorkspaceSlotAssignment(slotIndex: 1, bundleID: "com.google.Chrome", titleContains: "Work")
+        let original = Workspace(
+            id: UUID(),
+            name: "Coding",
+            layoutID: UUID(),
+            appsToLaunch: [],
+            appsToQuit: [],
+            focusMode: nil,
+            hotkey: nil,
+            triggers: [],
+            slotAssignments: [assignment],
+            showInQuickPicker: false,
+            isPresetSeed: false,
+            isModified: false
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Workspace.self, from: encoded)
+        XCTAssertEqual(decoded.slotAssignments, [assignment])
+        XCTAssertFalse(decoded.showInQuickPicker)
+    }
+
     func testIdentifiableConformance() {
         let w = Workspace(id: UUID(), name: "X", layoutID: UUID(),
                           appsToLaunch: [], appsToQuit: [],

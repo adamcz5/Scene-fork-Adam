@@ -49,6 +49,10 @@ struct WorkspaceEditorView: View {
                     layoutStore: layoutStore
                 )
                 HotkeyField(chord: $draft.hotkey)
+                Toggle("workspace.editor.quick_picker.show", isOn: $draft.showInQuickPicker)
+                Text("workspace.editor.quick_picker.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("workspace.editor.section.displays") {
                 DisplayLayoutsEditor(
@@ -60,6 +64,10 @@ struct WorkspaceEditorView: View {
             Section("workspace.editor.section.apps") {
                 AppPickerView(bundleIDs: $draft.appsToLaunch, label: "workspace.editor.apps_to_launch")
                 AppPickerView(bundleIDs: $draft.appsToQuit,   label: "workspace.editor.apps_to_quit")
+                SlotAssignmentEditor(
+                    slotAssignments: $draft.slotAssignments,
+                    layout: layoutStore.layouts.first(where: { $0.id == draft.layoutID })
+                )
             }
             Section("workspace.editor.section.persistent") {
                 AppPickerView(bundleIDs: $draft.pinnedApps, label: "workspace.editor.pinned_apps")
@@ -145,6 +153,16 @@ struct WorkspaceEditorView: View {
             // Editing while the "Saved" badge is still up — drop it so
             // the user can't mistake unsaved edits for saved state.
             if justSaved { justSaved = false }
+        }
+        .onChange(of: draft.layoutID) { _, newID in
+            // Switching to a layout with fewer/reordered zones can leave
+            // `slotAssignments` pointing past the new zone count. They're
+            // already harmless dead weight at apply time (`LayoutEngine.plan`
+            // range-checks `slotIndex`), but drop them here too so the editor
+            // doesn't show stale bindings for zones that no longer exist.
+            guard let layout = layoutStore.layouts.first(where: { $0.id == newID }) else { return }
+            let slotCount = layout.toLayout().slots.count
+            draft.slotAssignments.removeAll(where: { $0.slotIndex >= slotCount })
         }
     }
 

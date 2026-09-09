@@ -61,6 +61,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// (preserving the TCC `com.apple.macl` xattr so Accessibility survives).
     let updateInstaller = UpdateInstaller()
 
+    /// Hotkey-triggered Workspace Quick Picker. Wired to `coordinator`'s
+    /// global hotkey handler in `applicationDidFinishLaunching`.
+    @MainActor
+    private lazy var workspacePicker: WorkspacePickerWindowController = {
+        WorkspacePickerWindowController(
+            workspaceStore: workspaceVM,
+            layoutStore: layoutVM,
+            onSelect: { [weak self] id in
+                Task { @MainActor in await self?.coordinator.applyWorkspace(id: id) }
+            }
+        )
+    }()
+
     /// Single shared instance — re-shown on subsequent "Settings…" clicks
     /// rather than recreated, so view-model state survives close/reopen.
     @MainActor
@@ -259,6 +272,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             Task { await diagnostics.disable() }
         }
 
+        coordinator.onShowWorkspacePicker = { [weak self] in self?.workspacePicker.show() }
+
         // Starts permission polling + notification helper + hotkey registrar.
         coordinator.start()
 
@@ -283,12 +298,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             focusController: focus,
             workspaceStore: workspaceStore,
             layoutStore: layoutStore,
-            applyLayout: { [weak self] id, screen in
+            applyLayout: { [weak self] id, screen, assignments in
                 await MainActor.run {
                     if let screen {
-                        self?.coordinator.applyLayout(id: id, on: screen, from: .workspace) ?? false
+                        self?.coordinator.applyLayout(id: id, on: screen, assignments: assignments, from: .workspace) ?? false
                     } else {
-                        self?.coordinator.applyLayout(id: id, from: .workspace) ?? false
+                        self?.coordinator.applyLayout(id: id, assignments: assignments, from: .workspace) ?? false
                     }
                 }
             },

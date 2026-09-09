@@ -31,6 +31,12 @@ final class Coordinator: ObservableObject {
     /// and another on B and the tick follows the most recent.
     @Published private(set) var activeLayoutID: UUID?
 
+    /// Set by `AppDelegate` after constructing `WorkspacePickerWindowController`.
+    /// Invoked by the Quick Picker's global hotkey handler (registered in
+    /// `registerHotkeysFromStore()`). `nil` until that wiring runs, matching
+    /// the pattern of `onPermissionChange`/`onboarding.onCheck`.
+    var onShowWorkspacePicker: (() -> Void)?
+
     /// V0.6.1 Free Mode toggle. When `true`, all of Scene's automatic
     /// behavior pauses: layout hotkeys / menu clicks no-op, workspace
     /// activation no-ops, drag-swap and seam-resize observers short-circuit,
@@ -180,30 +186,46 @@ final class Coordinator: ObservableObject {
     /// Bool is consumed by `WorkspaceActivator` so it can skip the success
     /// banner and `setActive` on failure; hotkey/menu callers discard it.
     @discardableResult
-    func applyLayout(id: UUID, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+    func applyLayout(
+        id: UUID,
+        assignments: [WorkspaceSlotAssignment] = [],
+        from source: LayoutFiredPayload.Source = .menu,
+        force: Bool = false
+    ) -> Bool {
         guard let layout = layoutStore.layouts.first(where: { $0.id == id }) else {
             log.error("applyLayout: unknown id \(id.uuidString, privacy: .public)")
             return false
         }
-        return applyLayout(layout, from: source, force: force)
+        return applyLayout(layout, assignments: assignments, from: source, force: force)
     }
 
     /// Per-display variant: applies a layout to a specific screen rather than
     /// the screen under the mouse. Used by `WorkspaceActivator` when the
     /// workspace has `displayLayouts` configured.
     @discardableResult
-    func applyLayout(id: UUID, on screen: NSScreen, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+    func applyLayout(
+        id: UUID,
+        on screen: NSScreen,
+        assignments: [WorkspaceSlotAssignment] = [],
+        from source: LayoutFiredPayload.Source = .menu,
+        force: Bool = false
+    ) -> Bool {
         guard let layout = layoutStore.layouts.first(where: { $0.id == id }) else {
             log.error("applyLayout: unknown id \(id.uuidString, privacy: .public)")
             return false
         }
         guard permissionGranted else { onboarding.show(); return false }
         guard force || !freeMode else { return false }
-        return performApplyLayout(layout, on: screen, source: source)
+        return performApplyLayout(layout, on: screen, assignments: assignments, source: source)
     }
 
     @discardableResult
-    func applyLayout(_ custom: CustomLayout, from source: LayoutFiredPayload.Source = .menu, force: Bool = false) -> Bool {
+    func applyLayout(
+        _ custom: CustomLayout,
+        assignments: [WorkspaceSlotAssignment] = [],
+        from source: LayoutFiredPayload.Source = .menu,
+        force: Bool = false
+    ) -> Bool {
         guard permissionGranted else { onboarding.show(); return false }
         guard force || !freeMode else { return false }
         if let lastID = lastApplyCustomLayoutID, lastID == custom.id,
@@ -218,20 +240,29 @@ final class Coordinator: ObservableObject {
             let settle = repeatFireSettleMs
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(settle))
-                _ = self?.performApplyLayout(custom, source: source)
+                _ = self?.performApplyLayout(custom, assignments: assignments, source: source)
             }
             return true
         }
         lastApplyCustomLayoutID = custom.id
         lastApplyTime = Date()
-        return performApplyLayout(custom, source: source)
+        return performApplyLayout(custom, assignments: assignments, source: source)
     }
 
-    private func performApplyLayout(_ custom: CustomLayout, source: LayoutFiredPayload.Source) -> Bool {
-        return performApplyLayout(custom, on: ScreenResolver.activeScreen(), source: source)
+    private func performApplyLayout(
+        _ custom: CustomLayout,
+        assignments: [WorkspaceSlotAssignment],
+        source: LayoutFiredPayload.Source
+    ) -> Bool {
+        return performApplyLayout(custom, on: ScreenResolver.activeScreen(), assignments: assignments, source: source)
     }
 
-    private func performApplyLayout(_ custom: CustomLayout, on screen: NSScreen, source: LayoutFiredPayload.Source) -> Bool {
+    private func performApplyLayout(
+        _ custom: CustomLayout,
+        on screen: NSScreen,
+        assignments: [WorkspaceSlotAssignment] = [],
+        source: LayoutFiredPayload.Source
+    ) -> Bool {
         guard permissionGranted else { onboarding.show(); return false }
         do {
             let windows = try AXWindowEnumerator.listVisibleWindows(on: screen)
@@ -258,7 +289,8 @@ final class Coordinator: ObservableObject {
             let plan = LayoutEngine.plan(
                 windows: windows,
                 visibleFrame: TilingFrame.forScreen(screen),
-                layout: custom.toLayout()
+                layout: custom.toLayout(),
+                assignments: assignments
             )
             let cfg = settingsStore.animation
             let shouldAnimate = cfg.enabled && windows.count <= 6
@@ -439,7 +471,24 @@ final class Coordinator: ObservableObject {
                 )
             }
         }
+        if let binding = settingsStore.quickPickerHotkey, claim(binding) {
+            hotkeyManager.register(
+                uuid: Self.quickPickerHotkeyUUID,
+                keyCode: binding.keyCode,
+                modifiers: binding.carbonModifiers,
+                handler: { [weak self] in
+                    guard let self, !self.freeMode else { return }
+                    self.onShowWorkspacePicker?()
+                }
+            )
+        }
     }
+
+    /// Fixed identifier for `HotkeyManager.register` — the Quick Picker hotkey
+    /// isn't backed by a Layout/Workspace UUID, so it needs a stable synthetic
+    /// one instead (never collides: `Workspace`/`CustomLayout` IDs are always
+    /// freshly generated `UUID()`s).
+    private static let quickPickerHotkeyUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     // MARK: - Drag-to-swap lifecycle
 

@@ -26,7 +26,9 @@ final class WorkspaceActivator {
     /// whether to show the success banner and persist `activeWorkspaceID`.
     /// The optional `NSScreen?` parameter targets a specific display; `nil`
     /// means "use ScreenResolver.activeScreen()" (legacy single-display path).
-    private let applyLayout: (UUID, NSScreen?) async -> Bool
+    /// The `[WorkspaceSlotAssignment]` parameter carries the activating
+    /// Workspace's explicit app→zone bindings through to `LayoutEngine.plan`.
+    private let applyLayout: (UUID, NSScreen?, [WorkspaceSlotAssignment]) async -> Bool
     private let notifier: NotificationHelper
     private let desktopSwitcher: DesktopSwitching?
     private weak var appPolicyEnforcer: WorkspaceAppPolicyEnforcing?
@@ -38,7 +40,7 @@ final class WorkspaceActivator {
         focusController: FocusController,
         workspaceStore: WorkspaceStore,
         layoutStore: LayoutStore,
-        applyLayout: @escaping (UUID, NSScreen?) async -> Bool,
+        applyLayout: @escaping (UUID, NSScreen?, [WorkspaceSlotAssignment]) async -> Bool,
         notifier: NotificationHelper,
         desktopSwitcher: DesktopSwitching? = nil,
         appPolicyEnforcer: WorkspaceAppPolicyEnforcing? = nil,
@@ -133,7 +135,7 @@ final class WorkspaceActivator {
         let applyStart = Date()
         if workspace.displayLayouts.isEmpty {
             if layoutStore.layouts.contains(where: { $0.id == workspace.layoutID }) {
-                layoutApplied = await applyLayout(workspace.layoutID, nil)
+                layoutApplied = await applyLayout(workspace.layoutID, nil, workspace.slotAssignments)
                 if !layoutApplied {
                     notifier.notify(
                         title: String(localized: "workspace.apply_failed.title"),
@@ -152,7 +154,13 @@ final class WorkspaceActivator {
             for screen in NSScreen.screens {
                 let targetID = workspace.resolvedLayoutID(forDisplay: screen.localizedName)
                 guard layoutStore.layouts.contains(where: { $0.id == targetID }) else { continue }
-                let ok = await applyLayout(targetID, screen)
+                // v1 simplification: the same slotAssignments list (indexed
+                // against `workspace.layoutID`) is applied to whichever layout
+                // ends up on each screen. Fine while a Workspace's per-display
+                // layouts share the same zone count/order as its primary
+                // layout; a mismatch just means an assignment's slotIndex
+                // silently misses (falls through to the sticky/fill pass).
+                let ok = await applyLayout(targetID, screen, workspace.slotAssignments)
                 anyApplied = anyApplied || ok
             }
             if !anyApplied {

@@ -4598,7 +4598,216 @@
           }
         }
       }
-    }
+    },
+    "workspace.editor.zones": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Zone Assignments"
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.no_layout": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Pick a layout above to assign apps to its zones."
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.hint": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Tap a zone to pin a specific app to it. Unassigned zones fill normally."
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.assign_title": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Assign App to Zone"
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.no_app": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "No app chosen"
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.choose_app": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Choose App…"
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.title_hint": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Window title contains (optional)"
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.title_hint.caption": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Use this to tell apart two windows of the same app — e.g. a \"Work\" vs. \"Personal\" browser profile."
+            }
+          }
+        }
+      },
+    "workspace.editor.zones.clear": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Clear"
+            }
+          }
+        }
+      },
+    "common.done": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Done"
+            }
+          }
+        }
+      },
+    "workspace.editor.quick_picker.show": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Show in Quick Picker"
+            }
+          }
+        }
+      },
+    "workspace.editor.quick_picker.hint": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Included as a tile in the hotkey-triggered Workspace Quick Picker."
+            }
+          }
+        }
+      },
+    "hotkeys.section.quick_picker": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Quick Picker"
+            }
+          }
+        }
+      },
+    "hotkeys.quick_picker.label": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Workspace Quick Picker"
+            }
+          }
+        }
+      },
+    "hotkeys.quick_picker.hint": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Opens a floating panel to click a Workspace instead of remembering its chord."
+            }
+          }
+        }
+      },
+    "hotkeys.section.layouts": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Layouts"
+            }
+          }
+        }
+      },
+    "workspace.picker.title": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Choose a Workspace"
+            }
+          }
+        }
+      },
+    "workspace.picker.empty": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "No Workspaces are set to show here. Toggle “Show in Quick Picker” in a Workspace's settings."
+            }
+          }
+        }
+      },
+    "workspace.picker.active": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Active"
+            }
+          }
+        }
+      }
   },
   "version": "1.0"
 }

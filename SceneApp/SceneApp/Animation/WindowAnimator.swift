@@ -145,6 +145,14 @@ final class WindowAnimator: WindowFrameSink {
         }
         guard !tracks.isEmpty else { return }
 
+        // Raise once, up front — an ordering-only change (nothing hidden or
+        // minimized, no app activation), mirroring `LayoutEngine.apply`'s
+        // instant-path raise so the layout being animated into place is
+        // actually visible instead of buried behind whatever was on top.
+        for track in tracks {
+            try? byID[track.windowID]?.raise()
+        }
+
         let hasElectron = windows.contains { w in
             guard let id = w.bundleID else { return false }
             return Self.electronBundleIDs.contains(id)
