@@ -262,17 +262,19 @@ final class Coordinator: ObservableObject {
             )
             let cfg = settingsStore.animation
             let shouldAnimate = cfg.enabled && windows.count <= 6
+            // Overflow windows (not part of this layout) are left alone rather
+            // than minimized — the applied layout already covers the screen, so
+            // hiding other apps/windows is unnecessary and surprising. Strip
+            // `toMinimize` before handing the plan to `LayoutEngine.apply`.
+            let placedOnlyPlan = Plan(
+                placements: plan.placements,
+                toMinimize: [],
+                leftEmptySlotCount: plan.leftEmptySlotCount
+            )
             if shouldAnimate {
                 animator.animate(layoutID: custom.id, windows: windows, placements: plan.placements, config: cfg)
-                // Animation only covers placements — minimize overflow synchronously.
-                if !plan.toMinimize.isEmpty {
-                    _ = try LayoutEngine.apply(
-                        Plan(placements: [], toMinimize: plan.toMinimize, leftEmptySlotCount: plan.leftEmptySlotCount),
-                        on: windows
-                    )
-                }
             } else {
-                let outcome = try LayoutEngine.apply(plan, on: windows)
+                let outcome = try LayoutEngine.apply(placedOnlyPlan, on: windows)
                 if case .applied(let placed, let minimized, let leftEmpty, let failed) = outcome {
                     diagnostics.log(.layoutOutcomeInstant(.init(
                         layoutID: custom.id,

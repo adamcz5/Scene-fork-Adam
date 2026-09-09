@@ -78,20 +78,7 @@ extension LayoutEngine {
                 continue
             }
             do {
-                try window.setFrame(p.targetFrame)
-                if !rectsApproxEqual(window.frame, p.targetFrame, tolerance: electronTolerancePx) {
-                    let dx = p.targetFrame.origin.x - window.frame.origin.x
-                    let dy = p.targetFrame.origin.y - window.frame.origin.y
-                    let dw = p.targetFrame.width - window.frame.width
-                    let dh = p.targetFrame.height - window.frame.height
-                    let corrected = CGRect(
-                        x: p.targetFrame.origin.x + dx,
-                        y: p.targetFrame.origin.y + dy,
-                        width: p.targetFrame.width + dw,
-                        height: p.targetFrame.height + dh
-                    )
-                    try window.setFrame(corrected)
-                }
+                try applyFrameWithCorrection(p.targetFrame, to: window, tolerance: electronTolerancePx)
                 placed += 1
             } catch {
                 layoutEngineLog.error("setFrame failed for \(window.bundleID ?? "unknown", privacy: .public): \(String(describing: error), privacy: .public)")
@@ -117,5 +104,36 @@ extension LayoutEngine {
             leftEmpty: plan.leftEmptySlotCount,
             failed: failed
         )
+    }
+
+    /// Some apps (Electron windows especially, but also natives growing from a
+    /// small frame all the way to a full-screen slot) don't honor the whole
+    /// requested delta in one AX write — they clamp partway and only accept
+    /// the rest once the previous write has landed. A single overshoot
+    /// correction was enough for small drifts, but a small→full jump can need
+    /// several passes to converge, which is why re-firing "Full" repeatedly
+    /// used to be required to actually reach full size. Loop the correction
+    /// until the frame lands within tolerance or we give up after a bounded
+    /// number of attempts (apps that structurally refuse AX resizing, e.g.
+    /// System Settings, never converge — `maxAttempts` caps the cost of that).
+    private static func applyFrameWithCorrection(
+        _ target: CGRect,
+        to window: any WindowRef,
+        tolerance: CGFloat,
+        maxAttempts: Int = 5
+    ) throws {
+        try window.setFrame(target)
+        var attempt = 1
+        while attempt < maxAttempts, !rectsApproxEqual(window.frame, target, tolerance: tolerance) {
+            let current = window.frame
+            let corrected = CGRect(
+                x: target.origin.x + (target.origin.x - current.origin.x),
+                y: target.origin.y + (target.origin.y - current.origin.y),
+                width: target.width + (target.width - current.width),
+                height: target.height + (target.height - current.height)
+            )
+            try window.setFrame(corrected)
+            attempt += 1
+        }
     }
 }
