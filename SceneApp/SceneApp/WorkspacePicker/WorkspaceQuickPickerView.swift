@@ -15,7 +15,12 @@ struct WorkspaceQuickPickerView: View {
         workspaceStore.workspaces.filter { $0.showInQuickPicker }
     }
 
-    private let columns = [GridItem(.adaptive(minimum: 120, maximum: 140), spacing: 12)]
+    // Fixed 2-column grid rather than `.adaptive` — the panel's own size is
+    // *derived from* this view's fitted size (see `WorkspacePickerWindowController`'s
+    // `sizingOptions`), so an adaptive column count based on "available
+    // width" would be circular. No ScrollView: the grid always renders every
+    // tile, and the panel simply grows to fit — that's the point.
+    private let columns = [GridItem(.fixed(140)), GridItem(.fixed(140))]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -27,17 +32,15 @@ struct WorkspaceQuickPickerView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(pickerWorkspaces) { workspace in
-                            tile(for: workspace)
-                        }
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(pickerWorkspaces) { workspace in
+                        tile(for: workspace)
                     }
                 }
             }
         }
         .padding(16)
-        .frame(minWidth: 420, minHeight: 260)
+        .frame(minWidth: 360)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator))
         .onExitCommand { onDismiss() }

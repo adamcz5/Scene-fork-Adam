@@ -53,6 +53,7 @@ public struct LayoutFiredPayload: Codable, Sendable, Equatable {
     public enum Source: String, Codable, Sendable {
         case hotkey, menu, workspace
         case automation   // V0.7 — URL scheme + AppIntents fires
+        case reset        // "Reset Layout" — re-tile ignoring sticky/drag-swap state
     }
     public let layoutID: UUID
     public let source: Source

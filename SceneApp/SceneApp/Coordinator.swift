@@ -257,10 +257,25 @@ final class Coordinator: ObservableObject {
         return performApplyLayout(custom, on: ScreenResolver.activeScreen(), assignments: assignments, source: source)
     }
 
+    /// "Reset Layout" — re-applies whatever was applied most recently, but
+    /// ignoring sticky matching (see `LayoutEngine.plan`'s `respectSticky`)
+    /// so windows nudged out of their slots by drag-swap/seam-resize (or just
+    /// moved manually) get a clean z-order re-tile instead of being
+    /// re-anchored to wherever they currently sit. Sticky itself stays on by
+    /// default — this is an explicit escape hatch, not a settings toggle.
+    /// No-op (returns `false`) if nothing has been applied yet this session.
+    @discardableResult
+    func resetActiveLayout(force: Bool = false) -> Bool {
+        guard let custom = lastAppliedCustomLayout, let screen = lastScreen else { return false }
+        guard force || !freeMode else { return false }
+        return performApplyLayout(custom, on: screen, respectSticky: false, source: .reset)
+    }
+
     private func performApplyLayout(
         _ custom: CustomLayout,
         on screen: NSScreen,
         assignments: [WorkspaceSlotAssignment] = [],
+        respectSticky: Bool = true,
         source: LayoutFiredPayload.Source
     ) -> Bool {
         guard permissionGranted else { onboarding.show(); return false }
@@ -290,7 +305,8 @@ final class Coordinator: ObservableObject {
                 windows: windows,
                 visibleFrame: TilingFrame.forScreen(screen),
                 layout: custom.toLayout(),
-                assignments: assignments
+                assignments: assignments,
+                respectSticky: respectSticky
             )
             let cfg = settingsStore.animation
             let shouldAnimate = cfg.enabled && windows.count <= 6

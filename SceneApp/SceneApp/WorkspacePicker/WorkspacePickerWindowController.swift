@@ -14,6 +14,19 @@ final class WorkspacePickerWindowController {
     private let layoutStore: LayoutStoreViewModel
     private let onSelect: (UUID) -> Void
 
+    /// Fires on any mouse-down in another app while the panel is visible.
+    /// Global monitors only see events destined for *other* apps — see
+    /// `localClickMonitor` for clicks that land on one of Scene's own
+    /// other windows (e.g. Settings).
+    private var globalClickMonitor: Any?
+    /// Fires on any mouse-down within Scene itself. Dismisses when the click
+    /// lands on a window other than this panel (e.g. the Settings window
+    /// sitting behind it) — a plain `NSWindow.didResignKeyNotification`
+    /// observer doesn't reliably fire for a `.nonactivatingPanel`, since
+    /// those are designed to hold key status a little looser than a normal
+    /// window.
+    private var localClickMonitor: Any?
+
     init(
         workspaceStore: WorkspaceStoreViewModel,
         layoutStore: LayoutStoreViewModel,
@@ -39,6 +52,9 @@ final class WorkspacePickerWindowController {
                 onDismiss: { [weak self] in self?.hide() }
             )
             let host = NSHostingController(rootView: view)
+            // Let the panel size itself to fit however many workspace tiles
+            // there are — no internal scrolling, the panel just grows.
+            host.sizingOptions = [.preferredContentSize]
             let p = NSPanel(
                 contentRect: .zero,
                 styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -53,23 +69,22 @@ final class WorkspacePickerWindowController {
             p.isOpaque = false
             p.backgroundColor = .clear
             p.hasShadow = true
-            // Dismiss on click-away, like a command palette / menu — clicking
-            // any other window resigns this one's key status.
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didResignKeyNotification,
-                object: p,
-                queue: .main
-            ) { [weak self] _ in self?.hide() }
             window = p
             panel = p
         }
+
+        // Force a layout pass now so `panel.frame.size` reflects the SwiftUI
+        // content's actual fitted size (via `sizingOptions` above) before we
+        // use it to compute a centered origin below — without this the size
+        // read here can lag a runloop tick behind the workspace count.
+        panel.contentView?.layoutSubtreeIfNeeded()
 
         // Center on the screen under the mouse — same "wherever you're
         // looking" heuristic ScreenResolver.activeScreen() uses for layout
         // application, so the picker shows up where you're working.
         let screen = ScreenResolver.activeScreen()
         let size = panel.frame.size == .zero
-            ? CGSize(width: 480, height: 320)
+            ? CGSize(width: 420, height: 260)
             : panel.frame.size
         let origin = CGPoint(
             x: screen.frame.midX - size.width / 2,
@@ -79,9 +94,33 @@ final class WorkspacePickerWindowController {
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        installDismissMonitors(for: panel)
     }
 
     func hide() {
         window?.orderOut(nil)
+        removeDismissMonitors()
+    }
+
+    private func installDismissMonitors(for panel: NSPanel) {
+        removeDismissMonitors()
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            self?.hide()
+        }
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self, weak panel] event in
+            if event.window !== panel { self?.hide() }
+            return event
+        }
+    }
+
+    private func removeDismissMonitors() {
+        if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
+        if let localClickMonitor { NSEvent.removeMonitor(localClickMonitor) }
+        globalClickMonitor = nil
+        localClickMonitor = nil
     }
 }

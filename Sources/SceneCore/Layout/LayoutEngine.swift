@@ -19,7 +19,8 @@ public enum LayoutEngine {
         visibleFrame: CGRect,
         layout: Layout,
         assignments: [WorkspaceSlotAssignment] = [],
-        stickyTolerance: CGFloat = 10
+        stickyTolerance: CGFloat = 10,
+        respectSticky: Bool = true
     ) -> Plan {
         let slotRects = layout.slots.map { $0.absoluteRect(in: visibleFrame) }
 
@@ -42,14 +43,20 @@ public enum LayoutEngine {
         }
 
         // Sticky pass — z-order priority when two windows sit on the same rect.
-        for window in windows where !claimedIDs.contains(window.id) {
-            let claimed = slotRects.indices.first { idx in
-                slotToWindow[idx] == nil &&
-                rectsApproxEqual(window.frame, slotRects[idx], tolerance: stickyTolerance)
-            }
-            if let idx = claimed {
-                slotToWindow[idx] = window
-                claimedIDs.insert(window.id)
+        // Skippable (`respectSticky: false`) so a "Reset Layout" action can
+        // force a clean z-order re-tile of windows that have drifted from
+        // their slots via drag-swap/seam-resize, ignoring where they
+        // currently sit instead of re-anchoring to it.
+        if respectSticky {
+            for window in windows where !claimedIDs.contains(window.id) {
+                let claimed = slotRects.indices.first { idx in
+                    slotToWindow[idx] == nil &&
+                    rectsApproxEqual(window.frame, slotRects[idx], tolerance: stickyTolerance)
+                }
+                if let idx = claimed {
+                    slotToWindow[idx] = window
+                    claimedIDs.insert(window.id)
+                }
             }
         }
 

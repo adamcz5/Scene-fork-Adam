@@ -84,6 +84,19 @@ struct MenuBarContentView: View {
 
             PanelDivider()
 
+            Button(action: { coordinator.resetActiveLayout() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("menu.reset_layout")
+                    Spacer()
+                }
+            }
+            .buttonStyle(MenuRowButtonStyle())
+            .disabled(coordinator.freeMode || coordinator.activeLayoutID == nil)
+            .help("menu.reset_layout.help")
+
+            PanelDivider()
+
             Button(action: { coordinator.freeMode.toggle() }) {
                 HStack(spacing: 6) {
                     checkmarkColumn(coordinator.freeMode)

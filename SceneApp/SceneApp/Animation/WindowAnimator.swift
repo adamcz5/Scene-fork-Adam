@@ -48,6 +48,12 @@ final class WindowAnimator: WindowFrameSink {
     /// last wrote, another round-trip would be indistinguishable to the target
     /// app and only costs IPC time.
     private var lastWritten: [CGWindowID: CGRect] = [:]
+    /// This run's real destination per window — kept separately from the
+    /// interpolator's own state because `tickFromDisplayLink()` needs it
+    /// *after* `runner.isFinished` to run a corrective settle pass (see
+    /// `settleFinalFrames()`), by which point the interpolator itself has
+    /// nothing left to report.
+    private var currentTargets: [CGWindowID: CGRect] = [:]
 
     private struct AnimationRunState {
         let layoutID: UUID
@@ -144,6 +150,7 @@ final class WindowAnimator: WindowFrameSink {
             return AnimationTrack(windowID: p.windowID, start: w.frame, target: p.targetFrame)
         }
         guard !tracks.isEmpty else { return }
+        currentTargets = Dictionary(uniqueKeysWithValues: tracks.map { ($0.windowID, $0.target) })
 
         // Raise once, up front — an ordering-only change (nothing hidden or
         // minimized, no app activation), mirroring `LayoutEngine.apply`'s
@@ -258,9 +265,46 @@ final class WindowAnimator: WindowFrameSink {
                 ))
                 currentRun = nil
             }
+            settleFinalFrames()
             stopDisplayLink()
             byID.removeAll()
             lastWritten.removeAll()
+            currentTargets.removeAll()
+        }
+    }
+
+    /// Corrects any window still short of its real target once the animation
+    /// finishes. The interpolator's *last* tick writes an interpolated frame
+    /// equal to the target by construction, but some apps (Electron windows
+    /// especially, and natives growing a small window all the way to a
+    /// fullscreen slot) don't honor the whole requested delta from a single
+    /// AX write — they clamp partway and only accept the rest once the
+    /// previous write has landed. `LayoutEngine.apply`'s instant path already
+    /// loops this correction (see `applyFrameWithCorrection`); the animated
+    /// path never had an equivalent, so on a typical ≤6-window Workspace
+    /// (animation's default) a layout could visibly land short and require
+    /// re-firing the same layout/workspace to actually finish converging.
+    private func settleFinalFrames(maxAttempts: Int = 5, tolerance: CGFloat = 5) {
+        for (id, target) in currentTargets {
+            guard let window = byID[id] else { continue }
+            var attempt = 0
+            while attempt < maxAttempts, !rectsApproxEqual(window.frame, target, tolerance: tolerance) {
+                let current = window.frame
+                let corrected = CGRect(
+                    x: target.origin.x + (target.origin.x - current.origin.x),
+                    y: target.origin.y + (target.origin.y - current.origin.y),
+                    width: target.width + (target.width - current.width),
+                    height: target.height + (target.height - current.height)
+                )
+                do {
+                    try window.setFrame(corrected)
+                } catch {
+                    log.error("settle setFrame failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+                    currentRun?.setFrameFailures += 1
+                    break
+                }
+                attempt += 1
+            }
         }
     }
 

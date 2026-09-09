@@ -4807,6 +4807,28 @@
             }
           }
         }
+      },
+    "menu.reset_layout": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Reset Layout"
+            }
+          }
+        }
+      },
+    "menu.reset_layout.help": {
+        "extractionState": "manual",
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Re-tile the current layout from scratch, ignoring where windows currently sit."
+            }
+          }
+        }
       }
   },
   "version": "1.0"
