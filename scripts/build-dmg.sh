@@ -31,10 +31,16 @@ SCHEME="SceneApp"
 BUILD_DIR="build"
 DIST_DIR="dist"
 STAGE_DIR="$DIST_DIR/dmg-contents"
-APP_NAME="Scene.app"
-DMG_NAME="Scene-${VERSION}.dmg"
-DMG_RW="$DIST_DIR/Scene-${VERSION}-rw.dmg"
-VOLUME_NAME="Scene ${VERSION}"
+# "Scene Fork.app", not upstream's "Scene.app" — this fork already carries a
+# distinct bundle ID (com.abrychta.SceneFork vs. com.hillman.SceneApp), but
+# the *filename* matters too: dragging an app named "Scene.app" into
+# /Applications silently overwrites whatever is already there by that name,
+# bundle ID notwithstanding. A different name is what actually lets this
+# fork and an existing upstream install coexist side by side.
+APP_NAME="Scene Fork.app"
+DMG_NAME="SceneFork-${VERSION}.dmg"
+DMG_RW="$DIST_DIR/SceneFork-${VERSION}-rw.dmg"
+VOLUME_NAME="Scene Fork ${VERSION}"
 
 ICON_ICNS="$DIST_DIR/Scene.icns"
 BG_TIFF="dmg/background.tiff"
