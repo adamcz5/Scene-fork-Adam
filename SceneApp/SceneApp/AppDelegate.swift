@@ -200,9 +200,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// alongside their production install without colliding layouts /
     /// settings / workspaces / diagnostics. Bundle name fallback covers
     /// ad-hoc renames.
+    ///
+    /// This fork (`com.abrychta.SceneFork`) also gets its own folder,
+    /// `Scene-Fork` — not because sharing itself is unsafe, but because
+    /// this fork's schema versions (e.g. `SettingsStore.currentVersion`)
+    /// move ahead of whatever upstream build might be installed alongside
+    /// it. A shared file whose `"version"` this fork bumps becomes
+    /// unreadable by upstream's older decoder — which only recognizes
+    /// versions it shipped with and hard-fails (`fatalError`, via
+    /// `AppDelegate.init`'s catch block below) on anything newer. Learned
+    /// this the hard way: shared storage crashed an installed upstream
+    /// Scene.app the moment this fork wrote a `settings.json` at version 4.
     static func applicationSupportFolderName() -> String {
         if let id = Bundle.main.bundleIdentifier, id.hasSuffix(".testing") {
             return "Scene-testing"
+        }
+        if Bundle.main.bundleIdentifier == "com.abrychta.SceneFork" {
+            return "Scene-Fork"
         }
         let name = (Bundle.main.infoDictionary?["CFBundleName"] as? String) ?? ""
         if name.lowercased().contains("testing") {
