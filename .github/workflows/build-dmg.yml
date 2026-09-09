@@ -1,0 +1,41 @@
+name: Build DMG (manual)
+
+# Manual, on-demand build for people without Xcode installed locally.
+# GitHub's macos-26 runner ships Xcode 26.x (see ci.yml's reasoning for the
+# pin), so it can run scripts/build-dmg.sh the same way a local machine
+# would — just ad-hoc signed (SKIP_NOTARY=1) since there's no Developer ID
+# certificate or notarization credentials in this repo's secrets. Ad-hoc is
+# fine for personal use: the only extra step is right-click → Open on first
+# launch instead of a silent Gatekeeper pass.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for the DMG filename (e.g. 1.0.0)"
+        required: false
+        default: "dev"
+
+permissions:
+  contents: read
+
+jobs:
+  build-dmg:
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build DMG (ad-hoc signed, no notarization)
+        run: SKIP_NOTARY=1 ./scripts/build-dmg.sh "${{ inputs.version }}"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SceneFork-${{ inputs.version }}
+          path: dist/*.dmg
+          retention-days: 14
