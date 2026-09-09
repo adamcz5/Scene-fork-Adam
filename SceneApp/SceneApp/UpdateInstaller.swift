@@ -21,12 +21,21 @@ import os
 ///
 /// Why TCC survives: macOS TCC binds the Accessibility grant to the binary's
 /// **Designated Requirement** (`anchor apple generic and identifier
-/// "com.hillman.SceneApp" and certificate ... and certificate leaf[subject.OU]
+/// "com.abrychta.SceneFork" and certificate ... and certificate leaf[subject.OU]
 /// = "22K6G3HH9G"`). That requirement is stable across any release we sign
 /// with the same Developer ID, so TCC accepts the new binary. `ditto`
 /// preserves the `com.apple.macl` xattr (TCC's per-file pointer); the new
 /// install's `com.apple.quarantine` xattr is stripped to avoid a Gatekeeper
 /// re-prompt.
+///
+/// Note: this fork changed its bundle identifier away from upstream's
+/// `com.hillman.SceneApp` to avoid colliding with an existing upstream
+/// install (shared bundle ID would mean installing this fork overwrites, and
+/// upstream's update checker would offer to overwrite this fork back). One
+/// consequence: the *first* build under the new identifier needs Accessibility
+/// re-granted (a fresh Designated Requirement to TCC) — see `OnboardingView`'s
+/// `resetCommand`. After that one-time re-grant, TCC persists normally across
+/// this fork's own future updates as described above.
 @MainActor
 final class UpdateInstaller: ObservableObject {
     @Published private(set) var isInstalling = false

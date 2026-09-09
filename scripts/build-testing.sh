@@ -5,7 +5,7 @@
 #
 # What's different from a production build:
 #   - PRODUCT_NAME           : Scene-testing  (binary + .app named Scene-testing)
-#   - PRODUCT_BUNDLE_IDENTIFIER : com.hillman.SceneApp.testing
+#   - PRODUCT_BUNDLE_IDENTIFIER : com.abrychta.SceneFork.testing
 #       → fresh AX TCC entry, separate UserDefaults, separate Launch Services
 #   - Application Support    : ~/Library/Application Support/Scene-testing/
 #       → AppDelegate.applicationSupportFolderName() detects the .testing
@@ -28,7 +28,7 @@ cd "$ROOT"
 
 DERIVED="build/testing"
 PRODUCT_NAME="Scene-testing"
-BUNDLE_ID="com.hillman.SceneApp.testing"
+BUNDLE_ID="com.abrychta.SceneFork.testing"
 DEST_DIR="dist"
 DEST_APP="$DEST_DIR/$PRODUCT_NAME.app"
 

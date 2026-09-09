@@ -9,7 +9,7 @@ struct OnboardingView: View {
     /// Bundle ID matches PRODUCT_BUNDLE_IDENTIFIER in project.pbxproj. Hard-coded
     /// because the reset command must survive a broken AX permission state — no
     /// Bundle.main lookup gymnastics.
-    private let resetCommand = "tccutil reset Accessibility com.hillman.SceneApp"
+    private let resetCommand = "tccutil reset Accessibility com.abrychta.SceneFork"
 
     var body: some View {
         VStack(spacing: 16) {

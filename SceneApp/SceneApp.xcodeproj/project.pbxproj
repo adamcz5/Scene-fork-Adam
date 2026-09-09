@@ -290,6 +290,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceneApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Scene (Adam Fork)";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -297,7 +298,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.7.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hillman.SceneApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrychta.SceneFork;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -324,6 +325,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceneApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Scene (Adam Fork)";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -331,7 +333,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.7.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hillman.SceneApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrychta.SceneFork;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

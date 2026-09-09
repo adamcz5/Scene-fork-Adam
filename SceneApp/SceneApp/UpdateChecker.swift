@@ -41,8 +41,14 @@ final class UpdateChecker: ObservableObject {
     /// newest" true by construction. One page of 100 covers Scene's history
     /// many times over; if it ever overflows, GitHub returns newest-created
     /// first, so page 1 still holds every recent release.
+    // Repointed to this fork (adamcz5/Scene-fork-Adam) — was upstream
+    // ChiFungHillmanChan/macbook-resizer. Left pointed at upstream, this would
+    // offer (and one-click install, via `dmgURL` below) the *official* build
+    // over this fork's custom changes, since both share a bundle ID history.
+    // No releases published here yet, so this simply finds nothing to offer
+    // until this fork starts cutting its own tagged releases.
     private let apiURL = URL(string:
-        "https://api.github.com/repos/ChiFungHillmanChan/macbook-resizer/releases?per_page=100"
+        "https://api.github.com/repos/adamcz5/Scene-fork-Adam/releases?per_page=100"
     )!
     private let lastCheckKey = "com.scene.UpdateChecker.lastCheckedAt"
     private let minInterval: TimeInterval = 24 * 60 * 60
