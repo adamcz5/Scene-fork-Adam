@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import SceneCore
+import UniformTypeIdentifiers
 
 /// Visual zone→app assignment editor. Renders the Workspace's layout as a
 /// grid of tappable zones (same slot geometry as `LayoutThumbnail`, just
