@@ -2,7 +2,14 @@ import AppKit
 import SwiftUI
 import Combine
 import SceneCore
+import class SceneCore.Cancellable
 import UniformTypeIdentifiers
+
+/// Disambiguates SceneCore's closure-based `Cancellable` from `Combine.Cancellable`
+/// (both are in scope here — see `Coordinator.swift`'s identical typealias for
+/// the full explanation, including why the module-qualified `SceneCore.Cancellable`
+/// spelling doesn't work either).
+private typealias SceneCancellable = Cancellable
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var permissionGranted: Bool = false
@@ -78,6 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         )
     }()
+
+    /// V0.9 filtered ⌥Tab app switcher. Independent of `coordinator` — no AX
+    /// permission needed — so it's configured directly from `settingsStore`
+    /// rather than routed through `Coordinator.registerHotkeysFromStore()`.
+    @MainActor
+    private lazy var appSwitcherController = AppSwitcherController()
+    private var appSwitcherSettingsObserver: SceneCancellable?
 
     /// Single shared instance — re-shown on subsequent "Settings…" clicks
     /// rather than recreated, so view-model state survives close/reopen.
@@ -292,6 +306,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
 
         coordinator.onShowWorkspacePicker = { [weak self] in self?.workspacePicker.show() }
+
+        // V0.9 filtered app switcher — independent of AX permission, so wired
+        // directly here rather than through `coordinator.start()`.
+        appSwitcherController.configure(settingsStore.appSwitcher)
+        appSwitcherSettingsObserver = settingsStore.onChange { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.appSwitcherController.configure(self.settingsStore.appSwitcher) }
+        }
 
         // Starts permission polling + notification helper + hotkey registrar.
         coordinator.start()

@@ -168,4 +168,45 @@ extension SettingsStoreTests {
         XCTAssertEqual(fired, 1)
         token.cancel()
     }
+
+    // MARK: - V0.9 filtered app switcher
+
+    func testFreshStoreDefaultsAppSwitcherDisabled() throws {
+        let store = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(store.appSwitcher, AppSwitcherConfig.default)
+        XCTAssertFalse(store.appSwitcher.enabled)
+        XCTAssertTrue(store.appSwitcher.bundleIDs.isEmpty)
+    }
+
+    func testV4FileMigratesToV5WithDefaultAppSwitcher() throws {
+        // Simulate a pre-app-switcher settings file (version 4, no
+        // appSwitcher field).
+        let v4json = #"""
+        {"version":4,"animation":{"enabled":true,"durationMs":250,"easing":"easeOut"},"dragSwap":{"enabled":true,"distanceThresholdPt":40},"diagnosticsEnabled":true,"quickPickerHotkey":null}
+        """#.data(using: .utf8)!
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try v4json.write(to: fileURL)
+        let store = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(store.appSwitcher, AppSwitcherConfig.default, "V4 → V5 migration defaults appSwitcher = .default")
+        let raw = try Data(contentsOf: fileURL)
+        let rewritten = String(data: raw, encoding: .utf8) ?? ""
+        XCTAssertTrue(rewritten.contains("\"version\" : \(SettingsStore.currentVersion)"))
+        XCTAssertTrue(rewritten.contains("appSwitcher"))
+    }
+
+    func testSetAppSwitcherPersistsAndReloadsAndNotifies() throws {
+        let store = try SettingsStore(fileURL: fileURL)
+        var fired = 0
+        let token = store.onChange { fired += 1 }
+        let config = AppSwitcherConfig(enabled: true, bundleIDs: ["com.google.Chrome", "com.apple.Notes"])
+        try store.setAppSwitcher(config)
+        XCTAssertEqual(store.appSwitcher, config)
+        XCTAssertEqual(fired, 1)
+
+        let reloaded = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(reloaded.appSwitcher, config)
+        token.cancel()
+    }
 }

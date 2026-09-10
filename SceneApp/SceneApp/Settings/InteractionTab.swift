@@ -71,6 +71,14 @@ struct InteractionTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("interaction.app_switcher.section") {
+                Toggle("interaction.app_switcher.enable", isOn: appSwitcherEnabledBinding)
+                AppPickerView(bundleIDs: appSwitcherBundleIDsBinding, label: "interaction.app_switcher.apps")
+                Text("interaction.app_switcher.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
     }
@@ -162,6 +170,26 @@ struct InteractionTab: View {
                 try? settingsVM.store.setDragSwap(
                     DragSwapConfig(enabled: c.enabled, distanceThresholdPt: CGFloat(v), autoDisableAfterSeconds: c.autoDisableAfterSeconds)
                 )
+            }
+        )
+    }
+
+    private var appSwitcherEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settingsVM.appSwitcher.enabled },
+            set: { v in
+                let c = settingsVM.appSwitcher
+                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: v, bundleIDs: c.bundleIDs))
+            }
+        )
+    }
+
+    private var appSwitcherBundleIDsBinding: Binding<[String]> {
+        Binding(
+            get: { settingsVM.appSwitcher.bundleIDs },
+            set: { v in
+                let c = settingsVM.appSwitcher
+                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: c.enabled, bundleIDs: v))
             }
         )
     }

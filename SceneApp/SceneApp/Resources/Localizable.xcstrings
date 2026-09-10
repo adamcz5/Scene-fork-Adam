@@ -4913,6 +4913,30 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Apply" } }
       }
+    },
+    "interaction.app_switcher.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "App Switcher" } }
+      }
+    },
+    "interaction.app_switcher.enable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enable ⌥Tab app switcher" } }
+      }
+    },
+    "interaction.app_switcher.apps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apps to cycle between" } }
+      }
+    },
+    "interaction.app_switcher.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hold ⌥ and tap Tab to cycle only through the apps listed above; release ⌥ to switch. ⌥⇧Tab cycles backward. Leaves ⌘Tab untouched." } }
+      }
     }
   },
   "version": "1.0"
