@@ -37,7 +37,13 @@ final class AppSwitcherController {
     /// convention rather than adding a Carbon import just for one constant).
     private static let escapeKeyCode: UInt16 = 53
 
-    init(hud: AppSwitcherHUDWindowController = AppSwitcherHUDWindowController()) {
+    // No default value for `hud` — a default parameter expression is type-
+    // checked as if nonisolated regardless of the enclosing type's actor,
+    // and `AppSwitcherHUDWindowController.init()` is `@MainActor`-isolated
+    // (it touches `NSPanel`), so `AppSwitcherHUDWindowController()` as a
+    // default value fails to compile even though every real call site is
+    // already on MainActor. Construct it explicitly instead.
+    init(hud: AppSwitcherHUDWindowController) {
         self.hud = hud
     }
 

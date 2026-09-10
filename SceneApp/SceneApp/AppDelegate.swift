@@ -90,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// permission needed — so it's configured directly from `settingsStore`
     /// rather than routed through `Coordinator.registerHotkeysFromStore()`.
     @MainActor
-    private lazy var appSwitcherController = AppSwitcherController()
+    private lazy var appSwitcherController = AppSwitcherController(hud: AppSwitcherHUDWindowController())
     private var appSwitcherSettingsObserver: SceneCancellable?
 
     /// Single shared instance — re-shown on subsequent "Settings…" clicks
