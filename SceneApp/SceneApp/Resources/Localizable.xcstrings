@@ -4883,6 +4883,36 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Stickiness" } }
       }
+    },
+    "workspace.picker.pinned_section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pinned" } }
+      }
+    },
+    "workspace.picker.layouts_section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Layouts" } }
+      }
+    },
+    "workspace.picker.layouts_empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No layouts yet — create one in Settings." } }
+      }
+    },
+    "workspace.picker.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Back" } }
+      }
+    },
+    "workspace.picker.apply": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apply" } }
+      }
     }
   },
   "version": "1.0"

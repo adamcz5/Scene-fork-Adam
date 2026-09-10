@@ -70,6 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             layoutStore: layoutVM,
             onSelect: { [weak self] id in
                 Task { @MainActor in await self?.coordinator.applyWorkspace(id: id) }
+            },
+            onApplyLayout: { [weak self] layout, assignments in
+                Task { @MainActor in
+                    self?.coordinator.applyLayout(layout, assignments: assignments, from: .quickPicker)
+                }
             }
         )
     }()

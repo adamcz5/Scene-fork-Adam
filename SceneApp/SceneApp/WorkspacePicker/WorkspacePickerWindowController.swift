@@ -13,6 +13,11 @@ final class WorkspacePickerWindowController {
     private let workspaceStore: WorkspaceStoreViewModel
     private let layoutStore: LayoutStoreViewModel
     private let onSelect: (UUID) -> Void
+    /// Row 2's "pick a layout, then assign apps per zone, then apply" flow —
+    /// this is a one-off arrangement, not backed by a saved `Workspace`, so it
+    /// hands back the `CustomLayout` plus whatever ad-hoc
+    /// `WorkspaceSlotAssignment`s the user picked instead of a UUID.
+    private let onApplyLayout: (CustomLayout, [WorkspaceSlotAssignment]) -> Void
 
     /// Fires on any mouse-down in another app while the panel is visible.
     /// Global monitors only see events destined for *other* apps — see
@@ -30,11 +35,13 @@ final class WorkspacePickerWindowController {
     init(
         workspaceStore: WorkspaceStoreViewModel,
         layoutStore: LayoutStoreViewModel,
-        onSelect: @escaping (UUID) -> Void
+        onSelect: @escaping (UUID) -> Void,
+        onApplyLayout: @escaping (CustomLayout, [WorkspaceSlotAssignment]) -> Void
     ) {
         self.workspaceStore = workspaceStore
         self.layoutStore = layoutStore
         self.onSelect = onSelect
+        self.onApplyLayout = onApplyLayout
     }
 
     func show() {
@@ -47,6 +54,10 @@ final class WorkspacePickerWindowController {
                 layoutStore: layoutStore,
                 onSelect: { [weak self] id in
                     self?.onSelect(id)
+                    self?.hide()
+                },
+                onApplyLayout: { [weak self] layout, assignments in
+                    self?.onApplyLayout(layout, assignments)
                     self?.hide()
                 },
                 onDismiss: { [weak self] in self?.hide() }
@@ -84,7 +95,7 @@ final class WorkspacePickerWindowController {
         // application, so the picker shows up where you're working.
         let screen = ScreenResolver.activeScreen()
         let size = panel.frame.size == .zero
-            ? CGSize(width: 420, height: 260)
+            ? CGSize(width: 420, height: 420)
             : panel.frame.size
         let origin = CGPoint(
             x: screen.frame.midX - size.width / 2,

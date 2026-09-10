@@ -54,6 +54,7 @@ public struct LayoutFiredPayload: Codable, Sendable, Equatable {
         case hotkey, menu, workspace
         case automation   // V0.7 — URL scheme + AppIntents fires
         case reset        // "Reset Layout" — re-tile ignoring sticky/drag-swap state
+        case quickPicker  // V0.9 — ad-hoc layout+apps applied from the Quick Picker's layout row
     }
     public let layoutID: UUID
     public let source: Source
