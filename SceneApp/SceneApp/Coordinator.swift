@@ -79,6 +79,11 @@ final class Coordinator: ObservableObject {
     private var lastAppliedCustomLayout: CustomLayout?
     private var lastScreen: NSScreen?
     private var lastWindowToSlotIdx: [CGWindowID: Int] = [:]
+    /// Stamped on every successful layout/workspace apply. In "timed" drag-
+    /// swap mode (`DragSwapConfig.autoDisableAfterSeconds != nil`), stickiness
+    /// is only in effect for that many seconds after this timestamp — see
+    /// `effectiveDragSwapConfig()`.
+    private var stickyWindowStartedAt: Date?
     /// Tracks the last `applyLayout` fire. When the user re-fires the same
     /// layout within `repeatFireWindow`, we defer enumeration by
     /// `repeatFireSettleMs` so a newly-opened OS window has time to register
@@ -107,6 +112,16 @@ final class Coordinator: ObservableObject {
     /// through the same `HotkeyManager` that already routes layout chords.
     /// Registered by `AppDelegate` on launch via `configure(workspaceStore:)`.
     private var workspaceStoreObserver: SceneCancellable?
+
+    /// Re-registers hotkeys whenever Settings changes — most importantly the
+    /// Quick Picker hotkey recorded in Hotkeys tab. Without this, saving a new
+    /// binding via `SettingsStoreViewModel.setQuickPickerHotkey` persists it
+    /// but never calls `registerHotkeysFromStore()`, so the Carbon hotkey
+    /// stays whatever it was at last registration (or unregistered) until some
+    /// unrelated layout/workspace change happens to trigger one. That's the
+    /// "Quick Picker doesn't pop up" bug: the shortcut looked saved but was
+    /// never actually wired to `onShowWorkspacePicker`.
+    private var settingsStoreObserver: SceneCancellable?
 
     private let diagnostics: DiagnosticSink
 
@@ -153,6 +168,9 @@ final class Coordinator: ObservableObject {
             workspaceStoreObserver = workspaceStore.onChange { [weak self] in
                 Task { @MainActor in self?.registerHotkeysFromStore() }
             }
+        }
+        settingsStoreObserver = settingsStore.onChange { [weak self] in
+            Task { @MainActor in self?.registerHotkeysFromStore() }
         }
     }
 
@@ -334,6 +352,7 @@ final class Coordinator: ObservableObject {
             log.info("applied \(custom.name, privacy: .public) animated=\(shouldAnimate)")
             rebuildDragSwapObservers(plan: plan, windows: windows, layout: custom.toLayout(), customLayout: custom, screen: screen)
             activeLayoutID = custom.id
+            stickyWindowStartedAt = Date()
             return true
         } catch AXWindowEnumerator.EnumerationError.permissionDenied {
             stopDragSwapInfrastructure()
@@ -508,6 +527,20 @@ final class Coordinator: ObservableObject {
 
     // MARK: - Drag-to-swap lifecycle
 
+    /// The config `DragSwapController`/`SeamResizeController` should actually
+    /// honor right now. Off and Always modes pass `settingsStore.dragSwap`
+    /// through unchanged; Timed mode (`autoDisableAfterSeconds != nil`) forces
+    /// `enabled = false` once that many seconds have elapsed since the last
+    /// successful layout/workspace apply, so stickiness auto-expires instead
+    /// of staying on until the user flips it off by hand.
+    private func effectiveDragSwapConfig() -> DragSwapConfig {
+        let cfg = settingsStore.dragSwap
+        guard cfg.enabled, let window = cfg.autoDisableAfterSeconds else { return cfg }
+        guard let startedAt = stickyWindowStartedAt else { return cfg.withEnabled(false) }
+        let stillSticky = Date().timeIntervalSince(startedAt) < window
+        return stillSticky ? cfg : cfg.withEnabled(false)
+    }
+
     private func makeDragSwapController() -> DragSwapController {
         DragSwapController(
             contextProvider: { [weak self] in
@@ -522,7 +555,7 @@ final class Coordinator: ObservableObject {
                     windowToSlotIdx: self.lastWindowToSlotIdx
                 )
             },
-            config: { [weak self] in self?.settingsStore.dragSwap ?? .default },
+            config: { [weak self] in self?.effectiveDragSwapConfig() ?? .default },
             animationSink: dragSwapSink,
             onSwap: { [weak self] updates in
                 // Keep the authoritative snapshot in sync after each swap so
@@ -566,7 +599,7 @@ final class Coordinator: ObservableObject {
                     windowToSlotIdx: self.lastWindowToSlotIdx
                 )
             },
-            config: { [weak self] in self?.settingsStore.dragSwap ?? .default },
+            config: { [weak self] in self?.effectiveDragSwapConfig() ?? .default },
             // Same reason as drag-swap: reflow must measure the seam against
             // the frame the layout was actually tiled into.
             visibleFrameOverride: { TilingFrame.forScreen($0) }
@@ -616,6 +649,11 @@ final class Coordinator: ObservableObject {
             uniqueKeysWithValues: plan.placements.map { ($0.windowID, $0.slotIndex) }
         )
         let placedIDs = Set(lastPlacedWindows.map { $0.id })
+        // Timed mode: `stickyWindowStartedAt` was just stamped by the apply
+        // that called this method, so `effectiveDragSwapConfig()` reads as
+        // enabled here even in timed mode — the observers start, and later
+        // per-drag checks (`DragSwapController.handleWindowMoved`) are what
+        // actually gate on elapsed time via the same `config()` closure.
         guard settingsStore.dragSwap.enabled, !placedIDs.isEmpty else {
             stopDragSwapInfrastructure()
             return

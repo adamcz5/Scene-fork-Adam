@@ -34,7 +34,26 @@ struct InteractionTab: View {
             }
 
             Section("interaction.drag_swap.section") {
-                Toggle("interaction.drag_swap.enable", isOn: dragSwapEnabledBinding)
+                Picker("interaction.drag_swap.mode", selection: stickyModeBinding) {
+                    Text("interaction.drag_swap.mode.off").tag(StickyModeOption.off)
+                    Text("interaction.drag_swap.mode.always").tag(StickyModeOption.always)
+                    Text("interaction.drag_swap.mode.timed").tag(StickyModeOption.timed)
+                }
+                .pickerStyle(.segmented)
+
+                if stickyModeBinding.wrappedValue == .timed {
+                    Slider(value: stickyDurationBinding, in: DragSwapConfig.minAutoDisableSeconds...DragSwapConfig.maxAutoDisableSeconds, step: 1) {
+                        Text("interaction.drag_swap.mode.timed.duration")
+                    } minimumValueLabel: {
+                        Text("interaction.drag_swap.mode.timed.duration.min")
+                    } maximumValueLabel: {
+                        Text("interaction.drag_swap.mode.timed.duration.max")
+                    }
+                    Text(String(format: String(localized: "interaction.drag_swap.mode.timed.duration.value"), Int(stickyDurationBinding.wrappedValue)))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
                 Slider(value: dragSwapThresholdBinding, in: 10...100, step: 5) {
                     Text("interaction.drag_swap.threshold")
                 } minimumValueLabel: {
@@ -114,12 +133,23 @@ struct InteractionTab: View {
         )
     }
 
-    private var dragSwapEnabledBinding: Binding<Bool> {
+    /// Mirrors `MenuBarContentView`'s sticky-mode picker so Settings and the
+    /// menu bar always agree on off / always / timed.
+    private var stickyModeBinding: Binding<StickyModeOption> {
         Binding(
-            get: { settingsVM.dragSwap.enabled },
+            get: { settingsVM.dragSwap.stickyModeOption },
+            set: { settingsVM.dragSwap.applying($0, to: settingsVM.store) }
+        )
+    }
+
+    private var stickyDurationBinding: Binding<Double> {
+        Binding(
+            get: { settingsVM.dragSwap.autoDisableAfterSeconds ?? DragSwapConfig.defaultAutoDisableSeconds },
             set: { v in
                 let c = settingsVM.dragSwap
-                try? settingsVM.store.setDragSwap(DragSwapConfig(enabled: v, distanceThresholdPt: c.distanceThresholdPt))
+                try? settingsVM.store.setDragSwap(
+                    DragSwapConfig(enabled: c.enabled, distanceThresholdPt: c.distanceThresholdPt, autoDisableAfterSeconds: v)
+                )
             }
         )
     }
@@ -129,7 +159,9 @@ struct InteractionTab: View {
             get: { Double(settingsVM.dragSwap.distanceThresholdPt) },
             set: { v in
                 let c = settingsVM.dragSwap
-                try? settingsVM.store.setDragSwap(DragSwapConfig(enabled: c.enabled, distanceThresholdPt: CGFloat(v)))
+                try? settingsVM.store.setDragSwap(
+                    DragSwapConfig(enabled: c.enabled, distanceThresholdPt: CGFloat(v), autoDisableAfterSeconds: c.autoDisableAfterSeconds)
+                )
             }
         )
     }

@@ -4829,7 +4829,61 @@
             }
           }
         }
+      },
+    "interaction.drag_swap.mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stickiness" } }
       }
+    },
+    "interaction.drag_swap.mode.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Off" } }
+      }
+    },
+    "interaction.drag_swap.mode.always": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Always" } }
+      }
+    },
+    "interaction.drag_swap.mode.timed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Timed" } }
+      }
+    },
+    "interaction.drag_swap.mode.timed.duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sticky duration" } }
+      }
+    },
+    "interaction.drag_swap.mode.timed.duration.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "2s" } }
+      }
+    },
+    "interaction.drag_swap.mode.timed.duration.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "60s" } }
+      }
+    },
+    "interaction.drag_swap.mode.timed.duration.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%llds" } }
+      }
+    },
+    "menu.section.stickiness": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stickiness" } }
+      }
+    }
   },
   "version": "1.0"
 }

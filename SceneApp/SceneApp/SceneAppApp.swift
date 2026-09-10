@@ -9,6 +9,7 @@ struct SceneAppEntry: App {
         MenuBarExtra {
             MenuBarContentView(
                 coordinator: delegate.coordinator,
+                settingsVM: delegate.settingsVM,
                 workspaceStore: delegate.workspaceVM,
                 layoutStore: delegate.layoutVM
             )

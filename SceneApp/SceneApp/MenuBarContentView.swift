@@ -13,6 +13,10 @@ struct MenuBarContentView: View {
     @EnvironmentObject var appDelegate: AppDelegate
     @EnvironmentObject var updateChecker: UpdateChecker
     @EnvironmentObject var updateInstaller: UpdateInstaller
+    // Direct @ObservedObject, not @EnvironmentObject — same reasoning as
+    // `coordinator` above: the sticky-mode row needs to repaint the instant
+    // the mode is cycled from the menu itself.
+    @ObservedObject var settingsVM: SettingsStoreViewModel
     @ObservedObject var workspaceStore: WorkspaceStoreViewModel
     @ObservedObject var layoutStore: LayoutStoreViewModel
 
@@ -108,6 +112,10 @@ struct MenuBarContentView: View {
 
             PanelDivider()
 
+            stickyModeRow
+
+            PanelDivider()
+
             Button(action: {
                 closePanel()
                 appDelegate.openSettings()
@@ -195,6 +203,46 @@ struct MenuBarContentView: View {
         }
         .buttonStyle(MenuRowButtonStyle())
         .disabled(coordinator.freeMode)
+    }
+
+    /// Cycles Off → Always → Timed → Off on each click, mirroring the
+    /// segmented picker in Settings → Interaction so both stay in lockstep.
+    private var stickyModeRow: some View {
+        Button(action: { settingsVM.dragSwap.applying(nextStickyMode, to: settingsVM.store) }) {
+            HStack(spacing: 6) {
+                Image(systemName: "pin.fill")
+                    .foregroundStyle(settingsVM.dragSwap.stickyModeOption == .off ? .secondary : .tint)
+                Text("menu.section.stickiness")
+                Spacer()
+                Text(stickyModeValueLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(MenuRowButtonStyle())
+        .disabled(coordinator.freeMode)
+    }
+
+    private var nextStickyMode: StickyModeOption {
+        switch settingsVM.dragSwap.stickyModeOption {
+        case .off: return .always
+        case .always: return .timed
+        case .timed: return .off
+        }
+    }
+
+    private var stickyModeValueLabel: String {
+        let cfg = settingsVM.dragSwap
+        switch cfg.stickyModeOption {
+        case .off:
+            return String(localized: "interaction.drag_swap.mode.off")
+        case .always:
+            return String(localized: "interaction.drag_swap.mode.always")
+        case .timed:
+            let seconds = Int(cfg.autoDisableAfterSeconds ?? DragSwapConfig.defaultAutoDisableSeconds)
+            let duration = String(format: String(localized: "interaction.drag_swap.mode.timed.duration.value"), seconds)
+            return "\(String(localized: "interaction.drag_swap.mode.timed")) (\(duration))"
+        }
     }
 
     // MARK: - Small pieces
