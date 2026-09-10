@@ -211,7 +211,7 @@ struct MenuBarContentView: View {
         Button(action: { settingsVM.dragSwap.applying(nextStickyMode, to: settingsVM.store) }) {
             HStack(spacing: 6) {
                 Image(systemName: "pin.fill")
-                    .foregroundStyle(settingsVM.dragSwap.stickyModeOption == .off ? .secondary : .tint)
+                    .foregroundStyle(settingsVM.dragSwap.stickyModeOption == .off ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
                 Text("menu.section.stickiness")
                 Spacer()
                 Text(stickyModeValueLabel)
