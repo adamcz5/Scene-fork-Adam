@@ -11,7 +11,7 @@ import os
 ///   3. Write a helper bash script to `/tmp/`, launch it detached via
 ///      `nohup`, then `NSApp.terminate(nil)`.
 ///   4. Helper waits for Scene's PID to exit, mounts the DMG, replaces
-///      `/Applications/Scene.app` (or wherever Scene was installed) with
+///      `/Applications/Scene Fork.app` (or wherever Scene was installed) with
 ///      `ditto --noqtn` so the `com.apple.macl` xattr that anchors the TCC
 ///      Accessibility grant is preserved, unmounts, and `open`s the new app.
 ///
@@ -207,15 +207,15 @@ final class UpdateInstaller: ObservableObject {
         echo "Mounting DMG…"
         MOUNT_OUT=$(hdiutil attach "$DMG" -nobrowse -noverify -noautoopen)
         MOUNT=$(echo "$MOUNT_OUT" | grep '/Volumes/' | awk '{for(i=3;i<=NF;i++)printf "%s ",$i;print ""}' | sed 's/ *$//' | head -1)
-        if [ -z "$MOUNT" ] || [ ! -d "$MOUNT/Scene.app" ]; then
-            echo "ERROR: failed to mount DMG or Scene.app missing in mount"
+        if [ -z "$MOUNT" ] || [ ! -d "$MOUNT/Scene Fork.app" ]; then
+            echo "ERROR: failed to mount DMG or Scene Fork.app missing in mount"
             exit 1
         fi
         echo "  Mounted at: $MOUNT"
 
         # Backup the old install in case ditto fails partway. /tmp is a tmpfs
         # so this costs no real disk; cleaned up on success.
-        BACKUP="/tmp/Scene.app.bak-$$"
+        BACKUP="/tmp/Scene Fork.app.bak-$$"
         if [ -d "$APP_DEST" ]; then
             mv "$APP_DEST" "$BACKUP"
             echo "  Backed up old app to $BACKUP"
@@ -227,7 +227,7 @@ final class UpdateInstaller: ObservableObject {
         # com.apple.quarantine xattr that would otherwise trigger a Gatekeeper
         # "downloaded from internet" re-prompt on first launch.
         echo "Replacing app with ditto --noqtn…"
-        if ! ditto --noqtn "$MOUNT/Scene.app" "$APP_DEST"; then
+        if ! ditto --noqtn "$MOUNT/Scene Fork.app" "$APP_DEST"; then
             echo "ERROR: ditto failed; rolling back"
             rm -rf "$APP_DEST"
             mv "$BACKUP" "$APP_DEST"
@@ -264,7 +264,7 @@ final class UpdateInstaller: ObservableObject {
         // Detach from Scene's process group via nohup so the helper survives
         // our termination. Process becomes a child of launchd after Scene
         // exits, which is the correct place to be parented during the
-        // window where Scene.app on disk is briefly missing.
+        // window where Scene Fork.app on disk is briefly missing.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
         task.arguments = [scriptPath]
