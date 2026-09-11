@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import SceneCore
 
 /// Drives the filtered ⌥Tab / ⌥⇧Tab app switcher (V0.9): press-and-hold ⌥Tab
@@ -72,6 +73,14 @@ final class AppSwitcherController {
     // already on MainActor. Construct it explicitly instead.
     init(hud: AppSwitcherHUDWindowController) {
         self.hud = hud
+        // Seed from the window server's own z-order (front-to-back == most-
+        // to-least recently used) rather than starting empty. Without this,
+        // every fresh launch/restart shows the ring in configured (added)
+        // order until the user has manually switched between these specific
+        // apps at least once this session — easy to mistake for "it forgot
+        // my recency order" right after an update restart, when really it
+        // just hadn't learned anything yet.
+        mruOrder = Self.seedMRUOrderFromWindowServer()
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -93,6 +102,33 @@ final class AppSwitcherController {
     private func recordActivation(_ bundleID: String) {
         mruOrder.removeAll { $0 == bundleID }
         mruOrder.insert(bundleID, at: 0)
+    }
+
+    /// Front-to-back order of on-screen windows' owning apps, deduplicated to
+    /// one entry per bundle ID — `CGWindowListCopyWindowInfo` already returns
+    /// entries in window-server z-order, and the frontmost window's app is by
+    /// definition the most recently activated one. No Accessibility
+    /// permission needed: only window *titles*/AX manipulation require that,
+    /// not this basic ownership/z-order query.
+    private static func seedMRUOrderFromWindowServer() -> [String] {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        var seen = Set<String>()
+        var order: [String] = []
+        for info in list {
+            guard
+                let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                let layer = info[kCGWindowLayer as String] as? Int,
+                layer == 0,
+                let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
+                !seen.contains(bundleID)
+            else { continue }
+            seen.insert(bundleID)
+            order.append(bundleID)
+        }
+        return order
     }
 
     /// Re-registers (or tears down) the ⌥Tab/⌥⇧Tab hotkeys to match the
