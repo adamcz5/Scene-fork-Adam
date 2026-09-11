@@ -35,10 +35,22 @@ struct AboutTab: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
-            Link(
-                "github.com/adamcz5/Scene-fork-Adam",
-                destination: URL(string: "https://github.com/adamcz5/Scene-fork-Adam")!
-            )
+            VStack(spacing: 4) {
+                Link(
+                    "github.com/adamcz5/Scene-fork-Adam",
+                    destination: URL(string: "https://github.com/adamcz5/Scene-fork-Adam")!
+                )
+                HStack(spacing: 4) {
+                    Text("about.original_project")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Link(
+                        "github.com/ChiFungHillmanChan/macbook-resizer",
+                        destination: URL(string: "https://github.com/ChiFungHillmanChan/macbook-resizer")!
+                    )
+                    .font(.caption)
+                }
+            }
 
             Divider().padding(.vertical, 8)
 

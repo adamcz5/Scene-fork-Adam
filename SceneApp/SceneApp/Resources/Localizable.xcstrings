@@ -5027,6 +5027,12 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Check for Updates" } }
       }
+    },
+    "about.original_project": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Forked from:" } }
+      }
     }
   },
   "version": "1.0"
