@@ -86,8 +86,12 @@ final class AppSwitcherLogicTests: XCTestCase {
     }
 
     func testSameBundleEntriesKeepConfiguredOrderAsStableTiebreak() {
-        // MRU only knows the bundle ID activated, not which of two same-app
-        // entries — ties should resolve by configured (entries array) order.
+        // A plain bundle ID in `mruOrder` (as opposed to an entry's own
+        // `mruKey`) matches neither profile-split entry's key — this is what
+        // `AppSwitcherController.recordActivation` produces when it can't
+        // resolve which profile is actually frontmost (AX unavailable, or no
+        // window title matched either filter), and ties should resolve by
+        // configured (entries array) order rather than guessing.
         let personal = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Personal")
         let work = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work")
         let config = AppSwitcherConfig(enabled: true, entries: [personal, work])
@@ -96,6 +100,23 @@ final class AppSwitcherLogicTests: XCTestCase {
             windowTitles: { _ in ["Personal", "Work"] }
         )
         XCTAssertEqual(result.map(\.id), [personal.id, work.id])
+    }
+
+    func testProfileSplitEntriesRankIndependentlyByMRUKey() {
+        // Once the caller HAS resolved which specific profile was activated
+        // (via each entry's own `mruKey`, not just the shared bundle ID),
+        // only that entry should move — its sibling profile must not tag
+        // along just because they share a bundle ID.
+        let personal = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Personal")
+        let work = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work")
+        let other = AppSwitcherEntry(bundleID: "com.apple.Notes")
+        let config = AppSwitcherConfig(enabled: true, entries: [personal, work, other])
+        let mru = [work.mruKey, "com.apple.Notes"]
+        let result = AppSwitcherLogic.candidates(
+            config: config, mruOrder: mru, runningBundleIDs: ["com.google.Chrome", "com.apple.Notes"],
+            windowTitles: { _ in ["Personal", "Work"] }
+        )
+        XCTAssertEqual(result.map(\.id), [work.id, other.id, personal.id])
     }
 
     // MARK: - startIndex

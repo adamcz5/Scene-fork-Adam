@@ -13,12 +13,15 @@ public enum AppSwitcherLogic {
     ///   that per bundle ID — backed by AX in `AppSwitcherController`, or a
     ///   `{ _ in [] }` stub when Accessibility isn't granted, which correctly
     ///   drops every title-filtered entry rather than guessing).
-    /// - Ordered by `mruOrder` (most-recently-activated bundle ID first).
-    ///   Window-level recency isn't available from
-    ///   `NSWorkspace.didActivateApplicationNotification` — it only reports
-    ///   which APP activated — so entries sharing one bundle ID (e.g. two
-    ///   Chrome profile tiles) keep their configured relative order as a
-    ///   stable tiebreaker instead of just picking one arbitrarily.
+    /// - Ordered by `mruOrder` (most-recently-activated entry KEY first — see
+    ///   `AppSwitcherEntry.mruKey`, not necessarily just the bundle ID: two
+    ///   entries sharing one bundle ID, e.g. "Personal"/"Work" Chrome tiles,
+    ///   rank independently as long as the caller can tell them apart —
+    ///   `AppSwitcherController.recordActivation` resolves that via the
+    ///   frontmost window's title). An entry whose key never shows up in
+    ///   `mruOrder` (never resolved apart from its sibling, or simply never
+    ///   activated this session) falls back to configured relative order as
+    ///   a stable tiebreaker instead of being placed arbitrarily.
     public static func candidates(
         config: AppSwitcherConfig,
         mruOrder: [String],
@@ -34,16 +37,16 @@ public enum AppSwitcherLogic {
         }
 
         var rank: [String: Int] = [:]
-        for (i, bundleID) in mruOrder.enumerated() where rank[bundleID] == nil {
-            rank[bundleID] = i
+        for (i, key) in mruOrder.enumerated() where rank[key] == nil {
+            rank[key] = i
         }
         let unseenRank = mruOrder.count
 
         return config.entries.enumerated()
             .filter { matches($0.element) }
             .sorted { a, b in
-                let rankA = rank[a.element.bundleID] ?? unseenRank
-                let rankB = rank[b.element.bundleID] ?? unseenRank
+                let rankA = rank[a.element.mruKey] ?? unseenRank
+                let rankB = rank[b.element.mruKey] ?? unseenRank
                 if rankA != rankB { return rankA < rankB }
                 return a.offset < b.offset // stable tiebreak: configured order
             }

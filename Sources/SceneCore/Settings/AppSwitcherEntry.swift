@@ -39,4 +39,17 @@ public struct AppSwitcherEntry: Codable, Equatable, Identifiable, Sendable {
         self.label = label
         self.colorHex = colorHex
     }
+
+    /// Identity used for MRU ranking (`AppSwitcherLogic.candidates`). Plain
+    /// `bundleID` for the common single-tile case, but a profile-split entry
+    /// (titleContains set) gets its OWN key so "Personal" and "Work" Chrome
+    /// rank independently instead of moving together every time either one
+    /// gets activated — see `AppSwitcherController.recordActivation`, which
+    /// is what actually resolves which of two same-bundle entries is really
+    /// frontmost (NSWorkspace's activation notification only reports the
+    /// bundle ID, not the window/profile).
+    public var mruKey: String {
+        guard let titleContains, !titleContains.isEmpty else { return bundleID }
+        return "\(bundleID)#\(titleContains)"
+    }
 }

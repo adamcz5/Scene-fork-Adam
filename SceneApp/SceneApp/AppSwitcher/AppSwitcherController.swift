@@ -29,15 +29,22 @@ final class AppSwitcherController {
     private var selectedIndex = 0
     private var isActive = false
 
-    /// Bundle IDs in most-recently-activated-first order, updated on every
-    /// `NSWorkspace.didActivateApplicationNotification` regardless of
-    /// `config.enabled` — so the ring reads warm (most-to-least-recent) from
-    /// the very first ⌥Tab of a session rather than needing to "learn" it
-    /// live. Not persisted: a fresh app launch has no history yet, and
-    /// `AppSwitcherLogic.candidates` already falls back to config order for
-    /// any allow-listed running app this hasn't seen activate yet.
+    /// Entry keys (`AppSwitcherEntry.mruKey`) in most-recently-activated-first
+    /// order, updated on every `NSWorkspace.didActivateApplicationNotification`
+    /// regardless of `config.enabled` — so the ring reads warm (most-to-
+    /// least-recent) from the very first ⌥Tab of a session rather than
+    /// needing to "learn" it live. Not persisted: a fresh app launch has no
+    /// history yet, and `AppSwitcherLogic.candidates` already falls back to
+    /// config order for any allow-listed running app this hasn't seen
+    /// activate yet.
     private var mruOrder: [String] = []
     private var activationObserver: NSObjectProtocol?
+    /// `seedMRUOrder` needs `config.entries` to resolve profile-split
+    /// ambiguity, which isn't available yet in `init` (before the first real
+    /// `configure(_:)` call) — so seeding happens on the first `configure`
+    /// call instead, guarded by this flag so later config edits don't
+    /// clobber MRU state that's built up live since.
+    private var hasSeededMRU = false
 
     /// Windows belonging to `candidates[selectedIndex]` on the current Space,
     /// refreshed every time the app-level selection changes via
@@ -73,14 +80,6 @@ final class AppSwitcherController {
     // already on MainActor. Construct it explicitly instead.
     init(hud: AppSwitcherHUDWindowController) {
         self.hud = hud
-        // Seed from the window server's own z-order (front-to-back == most-
-        // to-least recently used) rather than starting empty. Without this,
-        // every fresh launch/restart shows the ring in configured (added)
-        // order until the user has manually switched between these specific
-        // apps at least once this session — easy to mistake for "it forgot
-        // my recency order" right after an update restart, when really it
-        // just hadn't learned anything yet.
-        mruOrder = Self.seedMRUOrderFromWindowServer()
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -99,23 +98,59 @@ final class AppSwitcherController {
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
     }
 
+    /// `NSWorkspace.didActivateApplicationNotification` only reports WHICH
+    /// APP activated, not which window/profile — so when more than one
+    /// configured entry shares this bundle ID (a "Personal"/"Work" Chrome
+    /// split), the bundle ID alone is ambiguous. Resolved here via
+    /// `resolveEntryKey`, which checks the app's actual frontmost window
+    /// title against each candidate entry's `titleContains`; if that can't
+    /// be resolved (AX not granted, or the title matches neither/both), this
+    /// intentionally does nothing rather than guess — leaving whichever
+    /// entry was last *correctly* resolved in place is better than
+    /// incorrectly promoting one arbitrarily.
     private func recordActivation(_ bundleID: String) {
-        mruOrder.removeAll { $0 == bundleID }
-        mruOrder.insert(bundleID, at: 0)
+        guard let key = resolveEntryKey(forBundleID: bundleID, among: config.entries) else { return }
+        mruOrder.removeAll { $0 == key }
+        mruOrder.insert(key, at: 0)
     }
 
-    /// Front-to-back order of on-screen windows' owning apps, deduplicated to
-    /// one entry per bundle ID — `CGWindowListCopyWindowInfo` already returns
-    /// entries in window-server z-order, and the frontmost window's app is by
-    /// definition the most recently activated one. No Accessibility
-    /// permission needed: only window *titles*/AX manipulation require that,
-    /// not this basic ownership/z-order query.
-    private static func seedMRUOrderFromWindowServer() -> [String] {
+    /// Resolves a bare bundle ID (all `NSWorkspace`/`CGWindowList` give us)
+    /// down to the specific `AppSwitcherEntry.mruKey` that's actually
+    /// frontmost right now. Trivial when only one configured entry has this
+    /// bundle ID; for a profile split, matches the app's current frontmost
+    /// window title (first result from `listVisibleWindows(forBundleID:)`,
+    /// which preserves the window server's own front-to-back z-order)
+    /// against each candidate's `titleContains`.
+    private func resolveEntryKey(forBundleID bundleID: String, among entries: [AppSwitcherEntry]) -> String? {
+        let matches = entries.filter { $0.bundleID == bundleID }
+        guard let first = matches.first else { return nil }
+        guard matches.count > 1 else { return first.mruKey }
+        guard AXPermission.check(),
+              let frontTitle = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID))?.first?.title
+        else { return nil }
+        return matches.first { entry in
+            guard let filter = entry.titleContains, !filter.isEmpty else { return false }
+            return frontTitle.localizedCaseInsensitiveContains(filter)
+        }?.mruKey
+    }
+
+    /// Front-to-back order of on-screen windows' owning apps (one bundle ID
+    /// per window-server z-order slot — `CGWindowListCopyWindowInfo` already
+    /// returns entries in that order, and the frontmost window's app is by
+    /// definition the most recently activated one), resolved down to entry
+    /// keys via `resolveEntryKey` so a profile split seeds correctly too.
+    /// Runs once, from `configure(_:)`, once `config.entries` is available —
+    /// see `hasSeededMRU`. No Accessibility permission needed for the z-order
+    /// scan itself; only the profile-split resolution step needs it, and
+    /// degrades to "skip this bundle ID" rather than guessing when it's
+    /// unavailable.
+    private func seedMRUOrder() -> [String] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
-        var seen = Set<String>()
+        var seenBundleIDs = Set<String>()
+        var seenKeys = Set<String>()
         var order: [String] = []
         for info in list {
             guard
@@ -123,10 +158,12 @@ final class AppSwitcherController {
                 let layer = info[kCGWindowLayer as String] as? Int,
                 layer == 0,
                 let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
-                !seen.contains(bundleID)
+                !seenBundleIDs.contains(bundleID)
             else { continue }
-            seen.insert(bundleID)
-            order.append(bundleID)
+            seenBundleIDs.insert(bundleID)
+            guard let key = resolveEntryKey(forBundleID: bundleID, among: config.entries), !seenKeys.contains(key) else { continue }
+            seenKeys.insert(key)
+            order.append(key)
         }
         return order
     }
@@ -136,6 +173,20 @@ final class AppSwitcherController {
     /// every `SettingsStore.onChange` fire.
     func configure(_ config: AppSwitcherConfig) {
         self.config = config
+        if !hasSeededMRU {
+            hasSeededMRU = true
+            // Seed from the window server's own z-order (front-to-back ==
+            // most-to-least recently used) rather than starting empty.
+            // Without this, every fresh launch/restart shows the ring in
+            // configured (added) order until the user has manually switched
+            // between these specific apps at least once this session — easy
+            // to mistake for "it forgot my recency order" right after an
+            // update restart, when really it just hadn't learned anything
+            // yet. Deferred to here (rather than `init`) because resolving a
+            // profile split needs `config.entries`, not available yet at
+            // `init` time.
+            mruOrder = seedMRUOrder()
+        }
         hotkeyManager.unregisterAll()
         guard config.enabled, !config.bundleIDs.isEmpty else {
             finish()
@@ -305,16 +356,35 @@ final class AppSwitcherController {
     private func commit() {
         defer { finish() }
         guard candidates.indices.contains(selectedIndex) else { return }
-        let bundleID = candidates[selectedIndex].bundleID
-        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
+        let entry = candidates[selectedIndex]
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == entry.bundleID }) else { return }
         app.activate()
-        // Raising a *specific* window only matters when there was more than
-        // one to choose from — `refreshWindowsForSelectedApp()` never
-        // populates `windowsForSelectedApp` for a single-window app, so this
-        // naturally falls through to plain `app.activate()` above (whichever
-        // window that app last had focused), matching pre-drill-down behavior.
+
         if windowsForSelectedApp.indices.contains(selectedWindowIndex) {
             try? windowsForSelectedApp[selectedWindowIndex].raise()
+            return
+        }
+
+        // `refreshWindowsForSelectedAppAsync()` may not have landed yet if
+        // Option was released fast (that's the whole point of it being
+        // async — Tab-cycling itself no longer waits on this). But raising
+        // the SPECIFIC window still matters here, once, at the moment of
+        // commit: `app.activate()` alone (a) raises whatever window this app
+        // itself last had focus on, which for a profile-split entry (e.g.
+        // "Personal" vs "Work" Chrome) can be the WRONG profile, and (b) has
+        // been observed to not reliably bring that window above every other
+        // on-screen window — an explicit AX raise is what actually does
+        // that. So this does one synchronous fallback fetch — a one-shot
+        // cost at commit, not a repeat of the original per-keystroke lag.
+        let all = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: entry.bundleID)) ?? []
+        let windows: [AXWindow]
+        if let filter = entry.titleContains, !filter.isEmpty {
+            windows = all.filter { ($0.title ?? "").localizedCaseInsensitiveContains(filter) }
+        } else {
+            windows = all
+        }
+        if let toRaise = windows.first {
+            try? toRaise.raise()
         }
     }
 
