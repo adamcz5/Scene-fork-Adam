@@ -15,7 +15,7 @@ import SceneCore
 /// AX). Basic app-level activation here needs no permission at all; only the
 /// per-window drill-down (`windowsForSelectedApp`) uses AX, and degrades
 /// gracefully to app-only activation when it isn't granted — see
-/// `refreshWindowsForSelectedApp()`.
+/// `refreshWindowsForSelectedAppAsync()`.
 @MainActor
 final class AppSwitcherController {
     private let hotkeyManager = HotkeyManager()
@@ -185,8 +185,19 @@ final class AppSwitcherController {
             guard !candidates.isEmpty else { return }
             selectedIndex = AppSwitcherLogic.advance(index: selectedIndex, count: candidates.count, reverse: reverse)
         }
-        refreshWindowsForSelectedApp()
+        // Show the tile/highlight change INSTANTLY — the per-window drill-down
+        // list is refreshed asynchronously below and folded in as a follow-up
+        // `showHUD()` once it lands. Previously this AX round trip
+        // (`refreshWindowsForSelectedApp`, a synchronous cross-process call to
+        // `kAXWindowsAttribute`) ran on the main thread before every single
+        // `showHUD()`, on every Tab press — for apps slow to answer AX
+        // queries (Chrome and other multi-process apps in particular) that
+        // made the whole switcher feel like it was lagging behind the
+        // keyboard, when only the drill-down sublist actually needed it.
+        selectedWindowIndex = 0
+        windowsForSelectedApp = []
         showHUD()
+        refreshWindowsForSelectedAppAsync()
     }
 
     /// Backs `AppSwitcherLogic.candidates`' `titleContains` matching. Returns
@@ -207,21 +218,32 @@ final class AppSwitcherController {
         showHUD()
     }
 
-    private func refreshWindowsForSelectedApp() {
-        selectedWindowIndex = 0
-        guard AXPermission.check(), candidates.indices.contains(selectedIndex) else {
-            windowsForSelectedApp = []
-            return
-        }
+    /// Bumped on every call so a slow AX response for a selection the user
+    /// has since tabbed away from can recognize it's stale and drop itself
+    /// instead of clobbering a newer one — see `refreshWindowsForSelectedAppAsync`.
+    private var windowsRefreshGeneration = 0
+
+    private func refreshWindowsForSelectedAppAsync() {
+        windowsRefreshGeneration += 1
+        let thisGeneration = windowsRefreshGeneration
+        guard AXPermission.check(), candidates.indices.contains(selectedIndex) else { return }
         let entry = candidates[selectedIndex]
-        let all = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: entry.bundleID)) ?? []
-        // A profile-split entry (titleContains set) drills down into only
-        // ITS windows — landing on the "Work" Chrome tile shouldn't offer
-        // Personal windows in the ⌥↓/⌥↑ list.
-        if let filter = entry.titleContains, !filter.isEmpty {
-            windowsForSelectedApp = all.filter { ($0.title ?? "").localizedCaseInsensitiveContains(filter) }
-        } else {
-            windowsForSelectedApp = all
+        Task.detached(priority: .userInitiated) {
+            let all = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: entry.bundleID)) ?? []
+            // A profile-split entry (titleContains set) drills down into only
+            // ITS windows — landing on the "Work" Chrome tile shouldn't offer
+            // Personal windows in the ⌥↓/⌥↑ list.
+            let filtered: [AXWindow]
+            if let filter = entry.titleContains, !filter.isEmpty {
+                filtered = all.filter { ($0.title ?? "").localizedCaseInsensitiveContains(filter) }
+            } else {
+                filtered = all
+            }
+            await MainActor.run { [weak self] in
+                guard let self, self.isActive, self.windowsRefreshGeneration == thisGeneration else { return }
+                self.windowsForSelectedApp = filtered
+                self.showHUD()
+            }
         }
     }
 
