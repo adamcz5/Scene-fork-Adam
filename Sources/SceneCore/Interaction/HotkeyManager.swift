@@ -115,4 +115,13 @@ public enum HotkeyModifiers {
     /// arbitrary chord, matching the fixed ⌥Tab / ⌥⇧Tab convention set by
     /// HopTab/AltTab-style switchers.
     public static let tabKeyCode: UInt32 = UInt32(kVK_Tab)
+    /// ⌥↓ / ⌥↑ — the app switcher's per-window drill-down (HopTab-style):
+    /// once an app with multiple windows is selected, these cycle which of
+    /// ITS windows will be raised on Option release. Registered as real
+    /// Carbon hotkeys (not a passive `NSEvent` monitor) so the arrow key is
+    /// actually suppressed system-wide instead of also leaking through to
+    /// whatever app is currently frontmost underneath the HUD (e.g. scrolling
+    /// a webpage).
+    public static let downArrowKeyCode: UInt32 = UInt32(kVK_DownArrow)
+    public static let upArrowKeyCode: UInt32 = UInt32(kVK_UpArrow)
 }

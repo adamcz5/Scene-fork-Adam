@@ -12,7 +12,7 @@ import SceneCore
 final class AppSwitcherHUDWindowController {
     private var window: NSPanel?
 
-    func show(candidates: [String], selectedIndex: Int) {
+    func show(candidates: [String], selectedIndex: Int, windowTitles: [String] = [], selectedWindowIndex: Int = 0) {
         let panel: NSPanel
         if let existing = window {
             panel = existing
@@ -38,7 +38,12 @@ final class AppSwitcherHUDWindowController {
             panel = p
         }
 
-        let host = NSHostingController(rootView: AppSwitcherHUDView(candidates: candidates, selectedIndex: selectedIndex))
+        let host = NSHostingController(rootView: AppSwitcherHUDView(
+            candidates: candidates,
+            selectedIndex: selectedIndex,
+            windowTitles: windowTitles,
+            selectedWindowIndex: selectedWindowIndex
+        ))
         host.sizingOptions = [.preferredContentSize]
         panel.contentViewController = host
         panel.contentView?.layoutSubtreeIfNeeded()

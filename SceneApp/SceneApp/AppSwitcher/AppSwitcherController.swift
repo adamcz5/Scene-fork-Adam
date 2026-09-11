@@ -4,13 +4,17 @@ import SceneCore
 /// Drives the filtered ⌥Tab / ⌥⇧Tab app switcher (V0.9): press-and-hold ⌥Tab
 /// to open a HUD over just the apps configured in Settings → Interaction →
 /// App Switcher, tap Tab again (while Option stays held) to advance, release
-/// Option to activate whichever app is highlighted.
+/// Option to activate whichever app is highlighted. For an app with more than
+/// one window open, ⌥↓/⌥↑ (also while Option stays held) drills into a
+/// HopTab-style list of that app's windows so a specific one — not just
+/// whichever it last had focused — gets raised on release.
 ///
 /// Deliberately independent of `Coordinator`'s `HotkeyManager` — that one is
 /// gated behind Accessibility permission (it manipulates window frames via
-/// AX); this controller only calls `NSRunningApplication.activate()`, which
-/// needs no special permission, so it should work even for a user who hasn't
-/// granted AX yet.
+/// AX). Basic app-level activation here needs no permission at all; only the
+/// per-window drill-down (`windowsForSelectedApp`) uses AX, and degrades
+/// gracefully to app-only activation when it isn't granted — see
+/// `refreshWindowsForSelectedApp()`.
 @MainActor
 final class AppSwitcherController {
     private let hotkeyManager = HotkeyManager()
@@ -34,6 +38,17 @@ final class AppSwitcherController {
     private var mruOrder: [String] = []
     private var activationObserver: NSObjectProtocol?
 
+    /// Windows belonging to `candidates[selectedIndex]` on the current Space,
+    /// refreshed every time the app-level selection changes via
+    /// `AXWindowEnumerator.listVisibleWindows(forBundleID:)` — empty if
+    /// Accessibility isn't granted (`try?` swallows the permission error,
+    /// falling back to plain app-level activation). The HUD's window-list UI
+    /// only renders when there's more than one — nothing to drill into for a
+    /// single-window app — but `commit()` still raises that one window when
+    /// present, which is harmless (equivalent to activating the app).
+    private var windowsForSelectedApp: [AXWindow] = []
+    private var selectedWindowIndex = 0
+
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
     private var globalKeyDownMonitor: Any?
@@ -41,6 +56,8 @@ final class AppSwitcherController {
 
     private static let forwardUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     private static let reverseUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    private static let windowDownUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+    private static let windowUpUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
     /// Carbon virtual keycode for Escape — matches `DragSwapController`'s own
     /// hardcoded 53 (`kVK_Escape` isn't in the small subset of `Carbon.HIToolbox`
     /// symbols re-exposed via `HotkeyModifiers`, so this mirrors the existing
@@ -100,6 +117,18 @@ final class AppSwitcherController {
             modifiers: HotkeyModifiers.optionShift,
             handler: { [weak self] in self?.trigger(reverse: true) }
         )
+        hotkeyManager.register(
+            uuid: Self.windowDownUUID,
+            keyCode: HotkeyModifiers.downArrowKeyCode,
+            modifiers: HotkeyModifiers.optionOnly,
+            handler: { [weak self] in self?.navigateWindow(reverse: false) }
+        )
+        hotkeyManager.register(
+            uuid: Self.windowUpUUID,
+            keyCode: HotkeyModifiers.upArrowKeyCode,
+            modifiers: HotkeyModifiers.optionOnly,
+            handler: { [weak self] in self?.navigateWindow(reverse: true) }
+        )
     }
 
     private func trigger(reverse: Bool) {
@@ -115,7 +144,36 @@ final class AppSwitcherController {
             guard !candidates.isEmpty else { return }
             selectedIndex = AppSwitcherLogic.advance(index: selectedIndex, count: candidates.count, reverse: reverse)
         }
-        hud.show(candidates: candidates, selectedIndex: selectedIndex)
+        refreshWindowsForSelectedApp()
+        showHUD()
+    }
+
+    /// ⌥↓ / ⌥↑ while the switcher is active: cycles which window of the
+    /// currently-selected app will be raised on Option release. No-op if
+    /// that app only has (or Accessibility can't see) one window — nothing
+    /// to choose between.
+    private func navigateWindow(reverse: Bool) {
+        guard isActive, windowsForSelectedApp.count > 1 else { return }
+        selectedWindowIndex = AppSwitcherLogic.advance(index: selectedWindowIndex, count: windowsForSelectedApp.count, reverse: reverse)
+        showHUD()
+    }
+
+    private func refreshWindowsForSelectedApp() {
+        selectedWindowIndex = 0
+        guard AXPermission.check(), candidates.indices.contains(selectedIndex) else {
+            windowsForSelectedApp = []
+            return
+        }
+        windowsForSelectedApp = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: candidates[selectedIndex])) ?? []
+    }
+
+    private func showHUD() {
+        hud.show(
+            candidates: candidates,
+            selectedIndex: selectedIndex,
+            windowTitles: windowsForSelectedApp.map { $0.title ?? String(localized: "app_switcher.window.untitled") },
+            selectedWindowIndex: selectedWindowIndex
+        )
     }
 
     // MARK: - Option-release commit / Esc cancel
@@ -168,15 +226,24 @@ final class AppSwitcherController {
         defer { finish() }
         guard candidates.indices.contains(selectedIndex) else { return }
         let bundleID = candidates[selectedIndex]
-        NSWorkspace.shared.runningApplications
-            .first(where: { $0.bundleIdentifier == bundleID })?
-            .activate()
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
+        app.activate()
+        // Raising a *specific* window only matters when there was more than
+        // one to choose from — `refreshWindowsForSelectedApp()` never
+        // populates `windowsForSelectedApp` for a single-window app, so this
+        // naturally falls through to plain `app.activate()` above (whichever
+        // window that app last had focused), matching pre-drill-down behavior.
+        if windowsForSelectedApp.indices.contains(selectedWindowIndex) {
+            try? windowsForSelectedApp[selectedWindowIndex].raise()
+        }
     }
 
     private func finish() {
         isActive = false
         candidates = []
         selectedIndex = 0
+        windowsForSelectedApp = []
+        selectedWindowIndex = 0
         removeMonitors()
         hud.hide()
     }

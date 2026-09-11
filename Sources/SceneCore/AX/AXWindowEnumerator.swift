@@ -45,6 +45,41 @@ public enum AXWindowEnumerator {
         return results
     }
 
+    /// V0.9: windows belonging to one specific app, for the app switcher's
+    /// per-window drill-down (HopTab-style — see `AppSwitcherController`).
+    /// Unlike `listVisibleWindows(on:)`, not scoped to a particular
+    /// `NSScreen` — the switcher isn't "which display is the mouse over",
+    /// it's "which windows does this app have". `.optionOnScreenOnly` still
+    /// restricts to the current Space, matching HopTab's own
+    /// space-aware window picker.
+    public static func listVisibleWindows(forBundleID bundleID: String) throws -> [AXWindow] {
+        guard AXPermission.check() else { throw EnumerationError.permissionDenied }
+
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            throw EnumerationError.cgWindowListFailed
+        }
+
+        var results: [AXWindow] = []
+        for info in list {
+            guard
+                let id = info[kCGWindowNumber as String] as? CGWindowID,
+                let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                let layer = info[kCGWindowLayer as String] as? Int,
+                layer == 0,
+                let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
+                let cgBounds = boundsFromDict(boundsDict),
+                NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == bundleID
+            else { continue }
+
+            if let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds),
+               !axWindow.isMinimized, !axWindow.isFullscreen {
+                results.append(axWindow)
+            }
+        }
+        return results
+    }
+
     // MARK: - private
 
     private static func boundsFromDict(_ dict: [String: CGFloat]) -> CGRect? {

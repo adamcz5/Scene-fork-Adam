@@ -9,9 +9,16 @@ import AppKit
 struct AppSwitcherHUDView: View {
     let candidates: [String]
     let selectedIndex: Int
+    /// Windows of the currently-selected app, most-recent-ish order (as built
+    /// by `AXWindowEnumerator`). Only rendered — as a HopTab-style list below
+    /// the icon row — when there's more than one; a single-window app has
+    /// nothing to drill into.
+    let windowTitles: [String]
+    let selectedWindowIndex: Int
 
     private let tileSize: CGFloat = 76
     private let iconSize: CGFloat = 56
+    private let windowListWidth: CGFloat = 280
 
     var body: some View {
         VStack(spacing: 14) {
@@ -25,9 +32,39 @@ struct AppSwitcherHUDView: View {
                     .font(.headline)
                     .foregroundStyle(.white)
             }
+            if windowTitles.count > 1 {
+                Rectangle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: windowListWidth, height: 1)
+                windowList
+            }
         }
         .padding(28)
         .background(Color.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var windowList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(windowTitles.enumerated()), id: \.offset) { index, title in
+                HStack(spacing: 8) {
+                    Image(systemName: "macwindow")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text(title)
+                        .font(.callout)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(index == selectedWindowIndex ? Color.accentColor.opacity(0.55) : Color.clear)
+                )
+            }
+        }
+        .frame(width: windowListWidth)
     }
 
     private var selectedName: String? {
