@@ -10,11 +10,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let layoutVM: LayoutStoreViewModel
     private let settingsVM: SettingsStoreViewModel
     private let workspaceVM: WorkspaceStoreViewModel
+    private let updateChecker: UpdateChecker
+    private let updateInstaller: UpdateInstaller
 
     init(
         layoutVM: LayoutStoreViewModel,
         settingsVM: SettingsStoreViewModel,
         workspaceVM: WorkspaceStoreViewModel,
+        updateChecker: UpdateChecker,
+        updateInstaller: UpdateInstaller,
         calendarPermissionRequester: @escaping () async -> Bool,
         reopenWelcome: @escaping () -> Void,
         exportDiagnostics: @escaping () async -> Void
@@ -22,6 +26,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.layoutVM = layoutVM
         self.settingsVM = settingsVM
         self.workspaceVM = workspaceVM
+        self.updateChecker = updateChecker
+        self.updateInstaller = updateInstaller
         let host = NSHostingController(
             rootView: SettingsRoot(
                 calendarPermissionRequester: calendarPermissionRequester,
@@ -31,6 +37,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 .environmentObject(layoutVM)
                 .environmentObject(settingsVM)
                 .environmentObject(workspaceVM)
+                .environmentObject(updateChecker)
+                .environmentObject(updateInstaller)
                 .modifier(WindowBackdrop())
         )
         // The hosting controller MUST be the window's root `contentViewController`.

@@ -4991,6 +4991,42 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Tap apps in the order you want them, left to right (%lld/%lld)" } }
       }
+    },
+    "about.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A personal fork of Scene — quick window tiling, Workspaces, a filtered \u2325Tab app switcher, and a Quick Picker, tuned to one person's workflow." } }
+      }
+    },
+    "about.updates.section.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Updates" } }
+      }
+    },
+    "about.updates.available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Update available: v%@" } }
+      }
+    },
+    "about.updates.up_to_date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "You\u2019re up to date (v%@)" } }
+      }
+    },
+    "about.updates.checking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Checking\u2026" } }
+      }
+    },
+    "about.updates.check_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check for Updates" } }
+      }
     }
   },
   "version": "1.0"

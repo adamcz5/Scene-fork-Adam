@@ -102,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             layoutVM: layoutVM,
             settingsVM: settingsVM,
             workspaceVM: workspaceVM,
+            updateChecker: updateChecker,
+            updateInstaller: updateInstaller,
             calendarPermissionRequester: { [weak self] in
                 guard let watcher = self?.triggerSupervisor?.calendar else { return false }
                 return await watcher.requestAccess()
