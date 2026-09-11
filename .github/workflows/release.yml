@@ -3,21 +3,35 @@ name: Release Update
 # Publishes an actual GitHub Release — tag + DMG asset — which is what makes
 # the in-app updater (UpdateChecker/UpdateInstaller) able to find and
 # one-click-install a new build. "Build DMG (manual)" only produces a
-# workflow-run artifact, which the Releases API never sees; this is the
-# deliberate "I'm cutting a real version now" action.
+# workflow-run artifact, which the Releases API never sees.
+#
+# Runs automatically on every push to `main`: no manual Actions click
+# required for the normal "I fixed something, ship it" flow. The version is
+# auto-incremented (patch bump on the latest `vX.Y.Z` tag) unless a specific
+# version is supplied via manual "Run workflow" — that manual path still
+# exists for cutting a deliberate minor/major bump.
 #
 # The built DMG is ad-hoc signed (no Developer ID cert in this repo's
 # secrets — a personal fork, no paid Apple Developer Program membership).
 # UpdateInstaller accepts that explicitly; see its verifyDMGSignature.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, e.g. 0.8.0 (plain dotted version, no leading v — the tag adds it, and this exact string gets baked into the app as its version)"
-        required: true
+        description: "Optional: exact version to release, e.g. 0.8.0 (plain dotted, no leading v). Leave blank to auto-bump the patch version."
+        required: false
 
 permissions:
   contents: write
+
+# One release build at a time; a second push while one is still building
+# waits rather than racing it (unlike CI, we don't want to cancel a
+# half-finished release).
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -25,20 +39,38 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Toolchain versions
         run: |
           swift --version
           xcodebuild -version
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          latest=$(git tag --list 'v*.*.*' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          if [ -z "$latest" ]; then
+            latest="0.0.0"
+          fi
+          IFS='.' read -r major minor patch <<< "$latest"
+          patch=$((patch + 1))
+          echo "value=$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+
       - name: Build DMG (ad-hoc signed, no notarization)
-        run: SKIP_NOTARY=1 ./scripts/build-dmg.sh "${{ inputs.version }}"
+        run: SKIP_NOTARY=1 ./scripts/build-dmg.sh "${{ steps.version.outputs.value }}"
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ inputs.version }}" \
+          gh release create "v${{ steps.version.outputs.value }}" \
             dist/*.dmg \
-            --title "v${{ inputs.version }}" \
+            --title "v${{ steps.version.outputs.value }}" \
             --generate-notes
