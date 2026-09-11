@@ -75,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         WorkspacePickerWindowController(
             workspaceStore: workspaceVM,
             layoutStore: layoutVM,
+            settingsVM: settingsVM,
             onSelect: { [weak self] id in
                 Task { @MainActor in await self?.coordinator.applyWorkspace(id: id) }
             },

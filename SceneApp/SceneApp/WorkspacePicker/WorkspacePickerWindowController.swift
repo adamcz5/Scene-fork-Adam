@@ -12,10 +12,11 @@ final class WorkspacePickerWindowController {
     private var window: NSPanel?
     private let workspaceStore: WorkspaceStoreViewModel
     private let layoutStore: LayoutStoreViewModel
+    private let settingsVM: SettingsStoreViewModel
     private let onSelect: (UUID) -> Void
-    /// Row 2's "pick a layout, then assign apps per zone, then apply" flow —
-    /// this is a one-off arrangement, not backed by a saved `Workspace`, so it
-    /// hands back the `CustomLayout` plus whatever ad-hoc
+    /// Row 2's "pick a layout, then click apps in order to fill its zones"
+    /// flow — this is a one-off arrangement, not backed by a saved
+    /// `Workspace`, so it hands back the `CustomLayout` plus whatever ad-hoc
     /// `WorkspaceSlotAssignment`s the user picked instead of a UUID.
     private let onApplyLayout: (CustomLayout, [WorkspaceSlotAssignment]) -> Void
 
@@ -35,11 +36,13 @@ final class WorkspacePickerWindowController {
     init(
         workspaceStore: WorkspaceStoreViewModel,
         layoutStore: LayoutStoreViewModel,
+        settingsVM: SettingsStoreViewModel,
         onSelect: @escaping (UUID) -> Void,
         onApplyLayout: @escaping (CustomLayout, [WorkspaceSlotAssignment]) -> Void
     ) {
         self.workspaceStore = workspaceStore
         self.layoutStore = layoutStore
+        self.settingsVM = settingsVM
         self.onSelect = onSelect
         self.onApplyLayout = onApplyLayout
     }
@@ -52,6 +55,7 @@ final class WorkspacePickerWindowController {
             let view = WorkspaceQuickPickerView(
                 workspaceStore: workspaceStore,
                 layoutStore: layoutStore,
+                settingsVM: settingsVM,
                 onSelect: { [weak self] id in
                     self?.onSelect(id)
                     self?.hide()

@@ -4985,6 +4985,12 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Color" } }
       }
+    },
+    "workspace.picker.pick_apps_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tap apps in the order you want them, left to right (%lld/%lld)" } }
+      }
     }
   },
   "version": "1.0"
