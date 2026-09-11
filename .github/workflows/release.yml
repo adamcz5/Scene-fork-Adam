@@ -1,0 +1,44 @@
+name: Release Update
+
+# Publishes an actual GitHub Release — tag + DMG asset — which is what makes
+# the in-app updater (UpdateChecker/UpdateInstaller) able to find and
+# one-click-install a new build. "Build DMG (manual)" only produces a
+# workflow-run artifact, which the Releases API never sees; this is the
+# deliberate "I'm cutting a real version now" action.
+#
+# The built DMG is ad-hoc signed (no Developer ID cert in this repo's
+# secrets — a personal fork, no paid Apple Developer Program membership).
+# UpdateInstaller accepts that explicitly; see its verifyDMGSignature.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.8.0 (plain dotted version, no leading v — the tag adds it, and this exact string gets baked into the app as its version)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build DMG (ad-hoc signed, no notarization)
+        run: SKIP_NOTARY=1 ./scripts/build-dmg.sh "${{ inputs.version }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            dist/*.dmg \
+            --title "v${{ inputs.version }}" \
+            --generate-notes

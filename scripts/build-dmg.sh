@@ -71,6 +71,32 @@ else
 fi
 
 echo "==> Building universal Release binary (arm64 + x86_64)…"
+
+# Bake $VERSION into CFBundleShortVersionString ONLY when it's a plain
+# dotted version (e.g. "0.8.0") — UpdateChecker's version comparison
+# (VersionCompare.swift) silently no-ops for anything that doesn't parse as
+# dot-separated integers, so a "dev"/"test-1" label (the default for casual
+# ad-hoc builds via the manual workflow) would otherwise get committed as the
+# app's real version, permanently breaking that install's ability to ever
+# detect a newer release. Falls back to whatever's already committed in the
+# Xcode project instead (read via `-showBuildSettings` rather than
+# conditionally omitting an xcodebuild argument, which would need a bash
+# array — empty-array expansion under `set -u` is a bash-version minefield,
+# and this script runs under macOS's ancient stock /bin/bash as much as any
+# newer one someone might have on PATH).
+if [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]]; then
+    BUILD_MARKETING_VERSION="$VERSION"
+else
+    BUILD_MARKETING_VERSION=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings 2>/dev/null \
+        | awk -F ' = ' '/ MARKETING_VERSION /{print $2; exit}') || true
+    # Defensive fallback if that extraction ever comes back empty (format
+    # drift in xcodebuild's output) — "0.0.0" is always "older" than any real
+    # release, so worst case this just means the update checker offers the
+    # latest release unconditionally, never that it silently stops checking.
+    BUILD_MARKETING_VERSION="${BUILD_MARKETING_VERSION:-0.0.0}"
+    echo "    (version label \"$VERSION\" isn't a plain dotted version — keeping committed MARKETING_VERSION=$BUILD_MARKETING_VERSION)"
+fi
+
 # SWIFT_OPTIMIZATION_LEVEL=-Onone workaround: Xcode 26.x's Swift Release
 # optimizer (-O / -Osize) crashes with an ICE in the SIL pipeline when the
 # deployment target is pre-26 (e.g. 14.0). Debug (-Onone) builds fine. Binary
@@ -90,6 +116,7 @@ xcodebuild \
     VALID_ARCHS="arm64 x86_64" \
     ONLY_ACTIVE_ARCH=NO \
     SWIFT_OPTIMIZATION_LEVEL=-Onone \
+    MARKETING_VERSION="$BUILD_MARKETING_VERSION" \
     build >/dev/null
 
 SRC_APP="$BUILD_DIR/Build/Products/Release/SceneApp.app"

@@ -135,11 +135,27 @@ final class UpdateInstaller: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "codesign verification failed: \(output)"]
             )
         }
-        guard output.contains("TeamIdentifier=\(expectedTeamID)") else {
+        // Accept either the expected Developer ID Team, OR an ad-hoc
+        // signature. This fork's own CI (build-dmg.yml / release.yml) has no
+        // Developer ID certificate in its secrets — no paid Apple Developer
+        // Program membership for a personal fork — so every DMG it produces
+        // is ad-hoc signed (`codesign --sign "-"`, no Team ID at all).
+        // Requiring `expectedTeamID` unconditionally would make in-app
+        // updates permanently impossible for this fork's own releases. This
+        // is a real, deliberate trade-off, not an oversight: an ad-hoc
+        // signature proves the DMG hasn't been altered since CI built it
+        // (codesign still fails on tampering), but NOT who built it —
+        // that assurance instead comes from the download URL only ever
+        // being reachable via a GitHub Release on this specific repo
+        // (`adamcz5/Scene-fork-Adam`), gated by GitHub's own auth on who can
+        // publish one.
+        let isExpectedTeam = output.contains("TeamIdentifier=\(expectedTeamID)")
+        let isAdHoc = output.contains("Signature=adhoc")
+        guard isExpectedTeam || isAdHoc else {
             throw NSError(
                 domain: "UpdateInstaller", code: 3,
                 userInfo: [NSLocalizedDescriptionKey:
-                    "DMG is not signed by Team ID \(expectedTeamID). Refusing to install."]
+                    "DMG has an unexpected signing identity (neither Team ID \(expectedTeamID) nor ad-hoc). Refusing to install."]
             )
         }
     }

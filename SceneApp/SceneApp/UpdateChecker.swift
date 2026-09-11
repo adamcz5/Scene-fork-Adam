@@ -45,8 +45,10 @@ final class UpdateChecker: ObservableObject {
     // ChiFungHillmanChan/macbook-resizer. Left pointed at upstream, this would
     // offer (and one-click install, via `dmgURL` below) the *official* build
     // over this fork's custom changes, since both share a bundle ID history.
-    // No releases published here yet, so this simply finds nothing to offer
-    // until this fork starts cutting its own tagged releases.
+    // Releases are cut via .github/workflows/release.yml (workflow_dispatch,
+    // tags `v<version>`, attaches the DMG) — a deliberate "publish this as a
+    // real update" action, distinct from build-dmg.yml's ad-hoc test builds
+    // (which only produce a workflow-run artifact the Releases API never sees).
     private let apiURL = URL(string:
         "https://api.github.com/repos/adamcz5/Scene-fork-Adam/releases?per_page=100"
     )!
