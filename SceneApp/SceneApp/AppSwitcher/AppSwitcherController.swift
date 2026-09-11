@@ -24,7 +24,7 @@ final class AppSwitcherController {
     /// Non-empty and `isActive` only while Option is physically held down
     /// after a ⌥Tab/⌥⇧Tab fire — cleared the instant Option is released
     /// (`commit()`) or Esc cancels the session.
-    private var candidates: [String] = []
+    private var candidates: [AppSwitcherEntry] = []
     private var selectedIndex = 0
     private var isActive = false
 
@@ -134,7 +134,12 @@ final class AppSwitcherController {
     private func trigger(reverse: Bool) {
         let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         if !isActive {
-            candidates = AppSwitcherLogic.candidates(config: config, mruOrder: mruOrder, runningBundleIDs: running)
+            candidates = AppSwitcherLogic.candidates(
+                config: config,
+                mruOrder: mruOrder,
+                runningBundleIDs: running,
+                windowTitles: windowTitlesProvider
+            )
             guard !candidates.isEmpty else { return }
             let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             selectedIndex = AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: frontmost)
@@ -146,6 +151,14 @@ final class AppSwitcherController {
         }
         refreshWindowsForSelectedApp()
         showHUD()
+    }
+
+    /// Backs `AppSwitcherLogic.candidates`' `titleContains` matching. Returns
+    /// `[]` (dropping every title-filtered entry, per that function's own
+    /// documented fallback) rather than guessing when AX isn't granted.
+    private func windowTitlesProvider(bundleID: String) -> [String] {
+        guard AXPermission.check() else { return [] }
+        return ((try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID)) ?? []).map { $0.title ?? "" }
     }
 
     /// ⌥↓ / ⌥↑ while the switcher is active: cycles which window of the
@@ -164,12 +177,21 @@ final class AppSwitcherController {
             windowsForSelectedApp = []
             return
         }
-        windowsForSelectedApp = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: candidates[selectedIndex])) ?? []
+        let entry = candidates[selectedIndex]
+        let all = (try? AXWindowEnumerator.listVisibleWindows(forBundleID: entry.bundleID)) ?? []
+        // A profile-split entry (titleContains set) drills down into only
+        // ITS windows — landing on the "Work" Chrome tile shouldn't offer
+        // Personal windows in the ⌥↓/⌥↑ list.
+        if let filter = entry.titleContains, !filter.isEmpty {
+            windowsForSelectedApp = all.filter { ($0.title ?? "").localizedCaseInsensitiveContains(filter) }
+        } else {
+            windowsForSelectedApp = all
+        }
     }
 
     private func showHUD() {
         hud.show(
-            candidates: candidates,
+            entries: candidates,
             selectedIndex: selectedIndex,
             windowTitles: windowsForSelectedApp.map { $0.title ?? String(localized: "app_switcher.window.untitled") },
             selectedWindowIndex: selectedWindowIndex
@@ -225,7 +247,7 @@ final class AppSwitcherController {
     private func commit() {
         defer { finish() }
         guard candidates.indices.contains(selectedIndex) else { return }
-        let bundleID = candidates[selectedIndex]
+        let bundleID = candidates[selectedIndex].bundleID
         guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
         app.activate()
         // Raising a *specific* window only matters when there was more than

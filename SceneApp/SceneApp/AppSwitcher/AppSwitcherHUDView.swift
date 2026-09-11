@@ -1,18 +1,21 @@
 import SwiftUI
 import AppKit
+import SceneCore
 
-/// Classic-switcher-style row: one tile per candidate app, the current
+/// Classic-switcher-style row: one tile per candidate entry, the current
 /// selection picked out with a rounded highlight, a small "running" dot under
 /// every icon (all candidates are, by construction, already-running apps —
-/// see `AppSwitcherLogic.candidates`), and the selected app's name below the
-/// row.
+/// see `AppSwitcherLogic.candidates`), and the selected entry's name below the
+/// row. An entry with `colorHex` set (e.g. a "Work" vs "Personal" Chrome
+/// split) draws a colored outline around its tile so two otherwise-identical
+/// app icons stay visually distinguishable at a glance.
 struct AppSwitcherHUDView: View {
-    let candidates: [String]
+    let entries: [AppSwitcherEntry]
     let selectedIndex: Int
-    /// Windows of the currently-selected app, most-recent-ish order (as built
-    /// by `AXWindowEnumerator`). Only rendered — as a HopTab-style list below
-    /// the icon row — when there's more than one; a single-window app has
-    /// nothing to drill into.
+    /// Windows of the currently-selected entry, most-recent-ish order (as
+    /// built by `AXWindowEnumerator`). Only rendered — as a HopTab-style list
+    /// below the icon row — when there's more than one; a single-window app
+    /// has nothing to drill into.
     let windowTitles: [String]
     let selectedWindowIndex: Int
 
@@ -23,8 +26,8 @@ struct AppSwitcherHUDView: View {
     var body: some View {
         VStack(spacing: 14) {
             HStack(spacing: 18) {
-                ForEach(Array(candidates.enumerated()), id: \.offset) { index, bundleID in
-                    tile(bundleID: bundleID, isSelected: index == selectedIndex)
+                ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
+                    tile(entry: entry, isSelected: index == selectedIndex)
                 }
             }
             if let name = selectedName {
@@ -68,11 +71,17 @@ struct AppSwitcherHUDView: View {
     }
 
     private var selectedName: String? {
-        guard candidates.indices.contains(selectedIndex) else { return nil }
-        return appName(for: candidates[selectedIndex])
+        guard entries.indices.contains(selectedIndex) else { return nil }
+        return displayName(for: entries[selectedIndex])
     }
 
-    private func tile(bundleID: String, isSelected: Bool) -> some View {
+    /// The entry's own `label` when set (e.g. "Work"), else the app's actual
+    /// display name from `NSWorkspace`.
+    private func displayName(for entry: AppSwitcherEntry) -> String {
+        entry.label ?? appName(for: entry.bundleID) ?? entry.bundleID
+    }
+
+    private func tile(entry: AppSwitcherEntry, isSelected: Bool) -> some View {
         VStack(spacing: 6) {
             ZStack {
                 if isSelected {
@@ -80,7 +89,7 @@ struct AppSwitcherHUDView: View {
                         .fill(Color.white.opacity(0.18))
                         .frame(width: tileSize, height: tileSize)
                 }
-                if let icon = appIcon(for: bundleID) {
+                if let icon = appIcon(for: entry.bundleID) {
                     Image(nsImage: icon)
                         .resizable()
                         .frame(width: iconSize, height: iconSize)
@@ -90,12 +99,22 @@ struct AppSwitcherHUDView: View {
                         .frame(width: iconSize, height: iconSize)
                         .foregroundStyle(.secondary)
                 }
+                if let color = color(for: entry) {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(color, lineWidth: 3)
+                        .frame(width: tileSize, height: tileSize)
+                }
             }
             .frame(width: tileSize, height: tileSize)
             Circle()
                 .fill(Color.green)
                 .frame(width: 5, height: 5)
         }
+    }
+
+    private func color(for entry: AppSwitcherEntry) -> Color? {
+        guard let hex = entry.colorHex else { return nil }
+        return Color(hex: hex)
     }
 
     // MARK: - NSWorkspace lookup
@@ -108,5 +127,19 @@ struct AppSwitcherHUDView: View {
     private func appName(for bundleID: String) -> String? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
         return FileManager.default.displayName(atPath: url.path)
+    }
+}
+
+extension Color {
+    /// Parses `"#RRGGBB"` or `"RRGGBB"`. Returns `nil` for anything else
+    /// (malformed stored value) rather than guessing a fallback color.
+    init?(hex: String) {
+        var s = hex
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let value = UInt32(s, radix: 16) else { return nil }
+        let r = Double((value >> 16) & 0xFF) / 255
+        let g = Double((value >> 8) & 0xFF) / 255
+        let b = Double(value & 0xFF) / 255
+        self = Color(red: r, green: g, blue: b)
     }
 }

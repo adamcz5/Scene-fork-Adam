@@ -1,44 +1,65 @@
 import Foundation
 
 /// Pure ring-cycling logic for the filtered ⌥Tab app switcher, split out from
-/// `AppSwitcherController` (SceneApp — owns the AppKit/NSRunningApplication
+/// `AppSwitcherController` (SceneApp — owns the AppKit/NSRunningApplication/AX
 /// side) so the actual cycling math is unit-testable without a running
 /// `NSWorkspace`.
 public enum AppSwitcherLogic {
-    /// Filters `runningBundleIDs` down to `config.bundleIDs` (the allow-list —
-    /// order here doesn't matter, it's just set membership), then orders the
-    /// result by `mruOrder` (most-recently-activated first) so the ring reads
-    /// left-to-right from most to least recently used, matching ⌘Tab's own
-    /// convention. `mruOrder` won't yet mention an app that's running but was
-    /// never activated this session (e.g. launched in the background before
-    /// Scene started tracking) — any such app is appended at the end, in
-    /// `config.bundleIDs`' order, rather than silently dropped.
-    public static func candidates(config: AppSwitcherConfig, mruOrder: [String], runningBundleIDs: Set<String>) -> [String] {
+    /// Resolves `config.entries` down to the ones actually selectable right
+    /// now, ordered for the ring:
+    /// - An entry with no `titleContains` matches whenever its app is running.
+    /// - An entry WITH `titleContains` additionally needs at least one open
+    ///   window of that app whose title contains it (`windowTitles` supplies
+    ///   that per bundle ID — backed by AX in `AppSwitcherController`, or a
+    ///   `{ _ in [] }` stub when Accessibility isn't granted, which correctly
+    ///   drops every title-filtered entry rather than guessing).
+    /// - Ordered by `mruOrder` (most-recently-activated bundle ID first).
+    ///   Window-level recency isn't available from
+    ///   `NSWorkspace.didActivateApplicationNotification` — it only reports
+    ///   which APP activated — so entries sharing one bundle ID (e.g. two
+    ///   Chrome profile tiles) keep their configured relative order as a
+    ///   stable tiebreaker instead of just picking one arbitrarily.
+    public static func candidates(
+        config: AppSwitcherConfig,
+        mruOrder: [String],
+        runningBundleIDs: Set<String>,
+        windowTitles: (String) -> [String] = { _ in [] }
+    ) -> [AppSwitcherEntry] {
         guard config.enabled else { return [] }
-        let allowed = Set(config.bundleIDs)
-        var seen = Set<String>()
-        var result: [String] = []
-        for bundleID in mruOrder where allowed.contains(bundleID) && runningBundleIDs.contains(bundleID) {
-            if seen.insert(bundleID).inserted {
-                result.append(bundleID)
+
+        func matches(_ entry: AppSwitcherEntry) -> Bool {
+            guard runningBundleIDs.contains(entry.bundleID) else { return false }
+            guard let filter = entry.titleContains, !filter.isEmpty else { return true }
+            return windowTitles(entry.bundleID).contains { $0.localizedCaseInsensitiveContains(filter) }
+        }
+
+        var rank: [String: Int] = [:]
+        for (i, bundleID) in mruOrder.enumerated() where rank[bundleID] == nil {
+            rank[bundleID] = i
+        }
+        let unseenRank = mruOrder.count
+
+        return config.entries.enumerated()
+            .filter { matches($0.element) }
+            .sorted { a, b in
+                let rankA = rank[a.element.bundleID] ?? unseenRank
+                let rankB = rank[b.element.bundleID] ?? unseenRank
+                if rankA != rankB { return rankA < rankB }
+                return a.offset < b.offset // stable tiebreak: configured order
             }
-        }
-        for bundleID in config.bundleIDs where runningBundleIDs.contains(bundleID) && !seen.contains(bundleID) {
-            seen.insert(bundleID)
-            result.append(bundleID)
-        }
-        return result
+            .map(\.element)
     }
 
     /// Index to start the ring at on the first ⌥Tab of a session. If the
-    /// frontmost app is in the ring, starts one step past it — so a single
-    /// tap immediately jumps to a *different* app, matching ⌘Tab's "tap once,
-    /// jump to the last app" feel — otherwise starts at the front of the ring.
-    public static func startIndex(candidates: [String], frontmostBundleID: String?) -> Int {
+    /// frontmost app is in the ring, starts one step past the FIRST entry
+    /// matching it — so a single tap immediately jumps to a *different* app,
+    /// matching ⌘Tab's "tap once, jump to the last app" feel — otherwise
+    /// starts at the front of the ring.
+    public static func startIndex(candidates: [AppSwitcherEntry], frontmostBundleID: String?) -> Int {
         guard !candidates.isEmpty else { return 0 }
-        guard let frontmostBundleID, let idx = candidates.firstIndex(of: frontmostBundleID) else {
-            return 0
-        }
+        guard let frontmostBundleID,
+              let idx = candidates.firstIndex(where: { $0.bundleID == frontmostBundleID })
+        else { return 0 }
         return (idx + 1) % candidates.count
     }
 

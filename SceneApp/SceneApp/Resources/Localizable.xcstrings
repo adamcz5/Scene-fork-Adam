@@ -4955,6 +4955,36 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Untitled Window" } }
       }
+    },
+    "interaction.app_switcher.entry.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "App Switcher Entry" } }
+      }
+    },
+    "interaction.app_switcher.entry.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Label (optional)" } }
+      }
+    },
+    "interaction.app_switcher.entry.title_hint.caption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Only matches when an open window's title contains this — e.g. split Chrome into separate \"Personal\" and \"Work\" tiles. Requires Accessibility permission." } }
+      }
+    },
+    "interaction.app_switcher.entry.custom_color": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Custom outline color" } }
+      }
+    },
+    "interaction.app_switcher.entry.color": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Color" } }
+      }
     }
   },
   "version": "1.0"

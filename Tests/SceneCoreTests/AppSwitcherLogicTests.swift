@@ -10,14 +10,16 @@ final class AppSwitcherLogicTests: XCTestCase {
         // Config lists a, b, c but "c" was activated most recently.
         let mru = ["c", "a", "b"]
         let running: Set<String> = ["a", "b", "c"]
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a", "b"])
+        let result = AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running)
+        XCTAssertEqual(result.map(\.bundleID), ["c", "a", "b"])
     }
 
     func testCandidatesFiltersOutNotRunningAndNotAllowed() {
         let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b", "c"])
         let mru = ["z", "c", "a", "b"] // "z" isn't in the allow-list at all
         let running: Set<String> = ["c", "a"] // "b" isn't running
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a"])
+        let result = AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running)
+        XCTAssertEqual(result.map(\.bundleID), ["c", "a"])
     }
 
     func testCandidatesAppendsRunningAppsMissingFromMRUOrder() {
@@ -27,7 +29,8 @@ final class AppSwitcherLogicTests: XCTestCase {
         let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b", "c"])
         let mru = ["c", "a"]
         let running: Set<String> = ["a", "b", "c"]
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a", "b"])
+        let result = AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running)
+        XCTAssertEqual(result.map(\.bundleID), ["c", "a", "b"])
     }
 
     func testCandidatesEmptyWhenDisabled() {
@@ -40,16 +43,71 @@ final class AppSwitcherLogicTests: XCTestCase {
         XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: ["a", "b"], runningBundleIDs: ["z"]), [])
     }
 
+    // MARK: - candidates: titleContains-filtered entries (Chrome profile split)
+
+    func testTitleFilteredEntryMatchesOnlyWhenAWindowTitleContainsIt() {
+        let personal = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Personal", label: "Personal")
+        let work = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work", label: "Work")
+        let config = AppSwitcherConfig(enabled: true, entries: [personal, work])
+        let running: Set<String> = ["com.google.Chrome"]
+
+        let result = AppSwitcherLogic.candidates(
+            config: config, mruOrder: [], runningBundleIDs: running,
+            windowTitles: { _ in ["Inbox – Work – Google Chrome"] }
+        )
+        XCTAssertEqual(result.map(\.id), [work.id], "only the entry whose filter matches an open window's title should show")
+    }
+
+    func testTitleFilteredEntryHiddenWhenNoWindowTitleMatches() {
+        let entry = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work")
+        let config = AppSwitcherConfig(enabled: true, entries: [entry])
+        let result = AppSwitcherLogic.candidates(
+            config: config, mruOrder: [], runningBundleIDs: ["com.google.Chrome"],
+            windowTitles: { _ in ["Personal – Google Chrome"] }
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testTitleFilteredEntryHiddenWithoutWindowTitleProvider() {
+        // Default `windowTitles` closure returns [] — simulates "Accessibility
+        // not granted, can't read titles" — so a title-filtered entry must be
+        // dropped rather than guessed as present.
+        let entry = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work")
+        let config = AppSwitcherConfig(enabled: true, entries: [entry])
+        let result = AppSwitcherLogic.candidates(config: config, mruOrder: [], runningBundleIDs: ["com.google.Chrome"])
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testUnfilteredEntryIgnoresWindowTitles() {
+        let entry = AppSwitcherEntry(bundleID: "com.apple.Notes")
+        let config = AppSwitcherConfig(enabled: true, entries: [entry])
+        let result = AppSwitcherLogic.candidates(config: config, mruOrder: [], runningBundleIDs: ["com.apple.Notes"])
+        XCTAssertEqual(result.map(\.id), [entry.id])
+    }
+
+    func testSameBundleEntriesKeepConfiguredOrderAsStableTiebreak() {
+        // MRU only knows the bundle ID activated, not which of two same-app
+        // entries — ties should resolve by configured (entries array) order.
+        let personal = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Personal")
+        let work = AppSwitcherEntry(bundleID: "com.google.Chrome", titleContains: "Work")
+        let config = AppSwitcherConfig(enabled: true, entries: [personal, work])
+        let result = AppSwitcherLogic.candidates(
+            config: config, mruOrder: ["com.google.Chrome"], runningBundleIDs: ["com.google.Chrome"],
+            windowTitles: { _ in ["Personal", "Work"] }
+        )
+        XCTAssertEqual(result.map(\.id), [personal.id, work.id])
+    }
+
     // MARK: - startIndex
 
     func testStartIndexJumpsPastFrontmostApp() {
-        let candidates = ["a", "b", "c"]
+        let candidates = ["a", "b", "c"].map { AppSwitcherEntry(bundleID: $0) }
         XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "a"), 1)
         XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "c"), 0, "wraps past the last entry")
     }
 
     func testStartIndexZeroWhenFrontmostNotInRing() {
-        let candidates = ["a", "b", "c"]
+        let candidates = ["a", "b", "c"].map { AppSwitcherEntry(bundleID: $0) }
         XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "z"), 0)
         XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: nil), 0)
     }

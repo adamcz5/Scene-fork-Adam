@@ -74,7 +74,7 @@ struct InteractionTab: View {
 
             Section("interaction.app_switcher.section") {
                 Toggle("interaction.app_switcher.enable", isOn: appSwitcherEnabledBinding)
-                AppPickerView(bundleIDs: appSwitcherBundleIDsBinding, label: "interaction.app_switcher.apps")
+                AppSwitcherEntriesEditor(entries: appSwitcherEntriesBinding)
                 Text("interaction.app_switcher.hint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -179,17 +179,17 @@ struct InteractionTab: View {
             get: { settingsVM.appSwitcher.enabled },
             set: { v in
                 let c = settingsVM.appSwitcher
-                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: v, bundleIDs: c.bundleIDs))
+                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: v, entries: c.entries))
             }
         )
     }
 
-    private var appSwitcherBundleIDsBinding: Binding<[String]> {
+    private var appSwitcherEntriesBinding: Binding<[AppSwitcherEntry]> {
         Binding(
-            get: { settingsVM.appSwitcher.bundleIDs },
+            get: { settingsVM.appSwitcher.entries },
             set: { v in
                 let c = settingsVM.appSwitcher
-                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: c.enabled, bundleIDs: v))
+                try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: c.enabled, entries: v))
             }
         )
     }
