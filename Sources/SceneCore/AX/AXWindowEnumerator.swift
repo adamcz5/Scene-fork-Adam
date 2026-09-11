@@ -126,6 +126,23 @@ public enum AXWindowEnumerator {
               let windows = windowsRef as? [AXUIElement]
         else { return nil }
 
+        // Exact match first: `_AXUIElementGetWindow` is a private-but-widely-used
+        // API (Rectangle, yabai, Contexts all rely on it) that maps an
+        // AXUIElement straight to its real CGWindowID, no geometry guessing
+        // involved. This is what lets two windows with IDENTICAL bounds (e.g.
+        // two Chrome windows both simply maximized on the same screen) resolve
+        // to two DIFFERENT AXUIElements instead of collapsing onto whichever
+        // one happens to come first in `kAXWindowsAttribute`. Bounds-matching
+        // below remains as a fallback for the rare case this private call
+        // fails (sandboxed/unusual apps) — see the phantom-duplicate comments
+        // on the call sites for why that fallback still needs its own dedup.
+        for window in windows {
+            var resolvedID: CGWindowID = 0
+            if _AXUIElementGetWindow(window, &resolvedID) == .success, resolvedID == id {
+                return AXWindow(element: window, id: id, pid: pid, bundleID: bundleID)
+            }
+        }
+
         for window in windows {
             var posRef: CFTypeRef?
             var sizeRef: CFTypeRef?
@@ -146,3 +163,11 @@ public enum AXWindowEnumerator {
         return nil
     }
 }
+
+/// Private API used by Rectangle, yabai, and Contexts to correlate an
+/// `AXUIElement` window handle with its real `CGWindowID` exactly, instead of
+/// guessing from bounds. Not in any public header, so it's declared here via
+/// `@_silgen_name` against the symbol actually exported by ApplicationServices.
+@_silgen_name("_AXUIElementGetWindow")
+@discardableResult
+private func _AXUIElementGetWindow(_ element: AXUIElement, _ outID: inout CGWindowID) -> AXError
