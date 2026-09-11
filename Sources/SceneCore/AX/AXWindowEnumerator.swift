@@ -72,8 +72,21 @@ public enum AXWindowEnumerator {
                 NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == bundleID
             else { continue }
 
-            if let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds),
-               !axWindow.isMinimized, !axWindow.isFullscreen {
+            guard let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds),
+                  !axWindow.isMinimized, !axWindow.isFullscreen
+            else { continue }
+
+            // Chrome (and other multi-process/Electron-style apps) can emit
+            // TWO separate entries in the raw window list — the real window
+            // plus an internal compositor/helper surface — that share the
+            // exact same bounds. `buildAXWindow` matches purely by bounds, so
+            // both CGWindowList entries resolve back to the SAME underlying
+            // `AXUIElement`, and without this check the same physical window
+            // would show up twice in the drill-down list. `CFEqual` (not `==`
+            // — `AXUIElement` doesn't bridge to Swift's `Equatable`) compares
+            // by actual AX element identity, not just coincidentally-equal bounds.
+            let alreadySeen = results.contains { CFEqual($0.axElement, axWindow.axElement) }
+            if !alreadySeen {
                 results.append(axWindow)
             }
         }
