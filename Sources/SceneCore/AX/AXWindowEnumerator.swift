@@ -36,10 +36,26 @@ public enum AXWindowEnumerator {
             guard screen.frame.contains(DisplayCoordinates.axToNS(centerTopLeft)) else { continue }
 
             let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
-            if let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds) {
-                if !axWindow.isMinimized && !axWindow.isFullscreen {
-                    results.append(axWindow)
-                }
+            guard let axWindow = buildAXWindow(pid: pid, id: id, bundleID: bundleID, bounds: cgBounds),
+                  !axWindow.isMinimized, !axWindow.isFullscreen
+            else { continue }
+
+            // Same dedup as `listVisibleWindows(forBundleID:)` below, and for
+            // the same reason: Chrome (and other multi-process/Electron-style
+            // apps) can emit two raw CGWindowList entries — the real window
+            // plus an internal compositor/helper surface — sharing identical
+            // bounds, which `buildAXWindow`'s bounds-matching then resolves
+            // to the SAME underlying `AXUIElement` twice. Left undeduped,
+            // `LayoutEngine.plan` would see a phantom "extra" window and
+            // place it into a slot that should've gone to (or displaced) a
+            // real one — windows landing in the wrong zone, or a real window
+            // getting bumped to overflow/minimized, for no reason visible to
+            // the user. This was very likely the cause of layouts appearing
+            // to shuffle windows around "randomly" when several windows of
+            // the same app (e.g. two Chrome profiles) were open.
+            let alreadySeen = results.contains { CFEqual($0.axElement, axWindow.axElement) }
+            if !alreadySeen {
+                results.append(axWindow)
             }
         }
         return results
