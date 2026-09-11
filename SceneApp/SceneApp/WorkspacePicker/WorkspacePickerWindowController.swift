@@ -95,7 +95,7 @@ final class WorkspacePickerWindowController {
         // application, so the picker shows up where you're working.
         let screen = ScreenResolver.activeScreen()
         let size = panel.frame.size == .zero
-            ? CGSize(width: 420, height: 420)
+            ? CGSize(width: 392, height: 460)
             : panel.frame.size
         let origin = CGPoint(
             x: screen.frame.midX - size.width / 2,

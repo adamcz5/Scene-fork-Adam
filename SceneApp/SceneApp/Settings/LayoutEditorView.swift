@@ -59,6 +59,11 @@ struct LayoutEditorView: View {
             }
             .frame(maxHeight: 200)
 
+            Toggle("layouts.editor.quick_picker.show", isOn: $draft.showInQuickPicker)
+            Text("layouts.editor.quick_picker.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             HStack {
                 Spacer()
                 Button("settings.action.cancel", action: onCancel)

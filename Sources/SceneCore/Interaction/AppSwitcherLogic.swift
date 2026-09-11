@@ -5,13 +5,29 @@ import Foundation
 /// side) so the actual cycling math is unit-testable without a running
 /// `NSWorkspace`.
 public enum AppSwitcherLogic {
-    /// Filters `runningBundleIDs` down to `config.bundleIDs`, preserving the
-    /// config's order (not whatever order `NSWorkspace.runningApplications`
-    /// happens to enumerate in) — the ring is a stable, user-controlled list,
-    /// not a most-recently-used one.
-    public static func candidates(config: AppSwitcherConfig, runningBundleIDs: Set<String>) -> [String] {
+    /// Filters `runningBundleIDs` down to `config.bundleIDs` (the allow-list —
+    /// order here doesn't matter, it's just set membership), then orders the
+    /// result by `mruOrder` (most-recently-activated first) so the ring reads
+    /// left-to-right from most to least recently used, matching ⌘Tab's own
+    /// convention. `mruOrder` won't yet mention an app that's running but was
+    /// never activated this session (e.g. launched in the background before
+    /// Scene started tracking) — any such app is appended at the end, in
+    /// `config.bundleIDs`' order, rather than silently dropped.
+    public static func candidates(config: AppSwitcherConfig, mruOrder: [String], runningBundleIDs: Set<String>) -> [String] {
         guard config.enabled else { return [] }
-        return config.bundleIDs.filter { runningBundleIDs.contains($0) }
+        let allowed = Set(config.bundleIDs)
+        var seen = Set<String>()
+        var result: [String] = []
+        for bundleID in mruOrder where allowed.contains(bundleID) && runningBundleIDs.contains(bundleID) {
+            if seen.insert(bundleID).inserted {
+                result.append(bundleID)
+            }
+        }
+        for bundleID in config.bundleIDs where runningBundleIDs.contains(bundleID) && !seen.contains(bundleID) {
+            seen.insert(bundleID)
+            result.append(bundleID)
+        }
+        return result
     }
 
     /// Index to start the ring at on the first ⌥Tab of a session. If the

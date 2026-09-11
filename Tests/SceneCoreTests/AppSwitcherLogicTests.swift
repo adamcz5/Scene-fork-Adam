@@ -5,21 +5,39 @@ final class AppSwitcherLogicTests: XCTestCase {
 
     // MARK: - candidates
 
-    func testCandidatesFiltersToConfiguredOrderNotRunningOrder() {
+    func testCandidatesOrderedByMRUNotConfigOrder() {
         let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b", "c"])
-        // Running set is unordered by nature; "c" and "a" running, "b" not.
-        let running: Set<String> = ["c", "a"]
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, runningBundleIDs: running), ["a", "c"])
+        // Config lists a, b, c but "c" was activated most recently.
+        let mru = ["c", "a", "b"]
+        let running: Set<String> = ["a", "b", "c"]
+        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a", "b"])
+    }
+
+    func testCandidatesFiltersOutNotRunningAndNotAllowed() {
+        let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b", "c"])
+        let mru = ["z", "c", "a", "b"] // "z" isn't in the allow-list at all
+        let running: Set<String> = ["c", "a"] // "b" isn't running
+        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a"])
+    }
+
+    func testCandidatesAppendsRunningAppsMissingFromMRUOrder() {
+        // "b" is allow-listed and running but was never activated this
+        // session (not yet in the MRU list) — it should still show up,
+        // appended after the MRU-ordered ones, not silently disappear.
+        let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b", "c"])
+        let mru = ["c", "a"]
+        let running: Set<String> = ["a", "b", "c"]
+        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: mru, runningBundleIDs: running), ["c", "a", "b"])
     }
 
     func testCandidatesEmptyWhenDisabled() {
         let config = AppSwitcherConfig(enabled: false, bundleIDs: ["a", "b"])
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, runningBundleIDs: ["a", "b"]), [])
+        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: ["a", "b"], runningBundleIDs: ["a", "b"]), [])
     }
 
     func testCandidatesEmptyWhenNoneRunning() {
         let config = AppSwitcherConfig(enabled: true, bundleIDs: ["a", "b"])
-        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, runningBundleIDs: ["z"]), [])
+        XCTAssertEqual(AppSwitcherLogic.candidates(config: config, mruOrder: ["a", "b"], runningBundleIDs: ["z"]), [])
     }
 
     // MARK: - startIndex

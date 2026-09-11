@@ -4937,6 +4937,18 @@
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Hold ⌥ and tap Tab to cycle only through the apps listed above; release ⌥ to switch. ⌥⇧Tab cycles backward. Leaves ⌘Tab untouched." } }
       }
+    },
+    "layouts.editor.quick_picker.show": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show in Quick Picker" } }
+      }
+    },
+    "layouts.editor.quick_picker.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Lets you arrange whatever's open into this layout from the Quick Picker's Layouts row." } }
+      }
     }
   },
   "version": "1.0"

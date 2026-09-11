@@ -24,6 +24,16 @@ final class AppSwitcherController {
     private var selectedIndex = 0
     private var isActive = false
 
+    /// Bundle IDs in most-recently-activated-first order, updated on every
+    /// `NSWorkspace.didActivateApplicationNotification` regardless of
+    /// `config.enabled` — so the ring reads warm (most-to-least-recent) from
+    /// the very first ⌥Tab of a session rather than needing to "learn" it
+    /// live. Not persisted: a fresh app launch has no history yet, and
+    /// `AppSwitcherLogic.candidates` already falls back to config order for
+    /// any allow-listed running app this hasn't seen activate yet.
+    private var mruOrder: [String] = []
+    private var activationObserver: NSObjectProtocol?
+
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
     private var globalKeyDownMonitor: Any?
@@ -45,6 +55,14 @@ final class AppSwitcherController {
     // already on MainActor. Construct it explicitly instead.
     init(hud: AppSwitcherHUDWindowController) {
         self.hud = hud
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier else { return }
+            self?.recordActivation(bundleID)
+        }
     }
 
     deinit {
@@ -52,6 +70,12 @@ final class AppSwitcherController {
         if let localFlagsMonitor { NSEvent.removeMonitor(localFlagsMonitor) }
         if let globalKeyDownMonitor { NSEvent.removeMonitor(globalKeyDownMonitor) }
         if let localKeyDownMonitor { NSEvent.removeMonitor(localKeyDownMonitor) }
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+    }
+
+    private func recordActivation(_ bundleID: String) {
+        mruOrder.removeAll { $0 == bundleID }
+        mruOrder.insert(bundleID, at: 0)
     }
 
     /// Re-registers (or tears down) the ⌥Tab/⌥⇧Tab hotkeys to match the
@@ -81,7 +105,7 @@ final class AppSwitcherController {
     private func trigger(reverse: Bool) {
         let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         if !isActive {
-            candidates = AppSwitcherLogic.candidates(config: config, runningBundleIDs: running)
+            candidates = AppSwitcherLogic.candidates(config: config, mruOrder: mruOrder, runningBundleIDs: running)
             guard !candidates.isEmpty else { return }
             let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             selectedIndex = AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: frontmost)

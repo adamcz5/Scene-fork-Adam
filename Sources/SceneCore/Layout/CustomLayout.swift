@@ -14,17 +14,23 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
     /// users author arbitrary split-based layouts beyond the fixed 11 templates.
     /// Nil (default) preserves the V0.2 template-based behaviour.
     public var customTree: LayoutNode?
+    /// V0.9: whether this Layout appears in the Quick Picker's Layouts row.
+    /// Defaults to `true` so existing/new Layouts show up without extra setup,
+    /// mirroring `Workspace.showInQuickPicker`'s same default-on convention.
+    public var showInQuickPicker: Bool
 
     public init(
         id: UUID, name: String, template: LayoutTemplate,
         slotProportions: [Double], hotkey: HotkeyBinding?,
         isPresetSeed: Bool, isModified: Bool,
-        customTree: LayoutNode? = nil
+        customTree: LayoutNode? = nil,
+        showInQuickPicker: Bool = true
     ) {
         self.id = id; self.name = name; self.template = template
         self.slotProportions = slotProportions; self.hotkey = hotkey
         self.isPresetSeed = isPresetSeed; self.isModified = isModified
         self.customTree = customTree
+        self.showInQuickPicker = showInQuickPicker
     }
 
     /// Builds a `Layout` value for `LayoutEngine.plan`. The synthesized `Layout.id` is `.full`
@@ -46,7 +52,7 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, template, slotProportions, hotkey,
-             isPresetSeed, isModified, customTree
+             isPresetSeed, isModified, customTree, showInQuickPicker
     }
 
     /// Decodes legacy JSON (pre-V0.7) that lacks `customTree`, plus current
@@ -61,6 +67,7 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         self.isPresetSeed = try c.decode(Bool.self, forKey: .isPresetSeed)
         self.isModified = try c.decode(Bool.self, forKey: .isModified)
         self.customTree = try c.decodeIfPresent(LayoutNode.self, forKey: .customTree)
+        self.showInQuickPicker = try c.decodeIfPresent(Bool.self, forKey: .showInQuickPicker) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -76,5 +83,6 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         // `customTree` key — keeps the on-disk format minimal and lets older
         // tools / eyes read the file without seeing an unfamiliar nested blob.
         try c.encodeIfPresent(customTree, forKey: .customTree)
+        try c.encode(showInQuickPicker, forKey: .showInQuickPicker)
     }
 }

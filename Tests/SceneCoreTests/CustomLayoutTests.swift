@@ -61,6 +61,41 @@ final class CustomLayoutTests: XCTestCase {
         XCTAssertNil(decoded.hotkey)
     }
 
+    // MARK: - V0.9 showInQuickPicker
+
+    func testLegacyLayoutDecodesWithShowInQuickPickerDefaultTrue() throws {
+        // Pre-V0.9 JSON: no showInQuickPicker field.
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Legacy",
+          "template": "single",
+          "slotProportions": [],
+          "hotkey": null,
+          "isPresetSeed": false,
+          "isModified": false
+        }
+        """
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: Data(json.utf8))
+        XCTAssertTrue(decoded.showInQuickPicker, "existing Layouts should keep showing in the picker")
+    }
+
+    func testShowInQuickPickerFalseRoundTrips() throws {
+        let original = CustomLayout(
+            id: UUID(),
+            name: "Hidden",
+            template: .single,
+            slotProportions: [],
+            hotkey: nil,
+            isPresetSeed: false,
+            isModified: false,
+            showInQuickPicker: false
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: encoded)
+        XCTAssertFalse(decoded.showInQuickPicker)
+    }
+
     // MARK: - V0.7 customTree
 
     func testToLayoutUsesCustomTreeWhenPresent() {
