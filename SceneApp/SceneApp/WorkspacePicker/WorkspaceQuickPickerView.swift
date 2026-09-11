@@ -9,14 +9,13 @@ import SceneCore
 ///
 /// Row 2 ("Layouts"): Layouts filtered to `CustomLayout.showInQuickPicker`
 /// (toggled per-Layout from `LayoutEditorView`, mirroring the Workspace
-/// flag), with no apps attached. Clicking one swaps this row's content for a
-/// per-zone app-assignment editor (reusing `SlotAssignmentEditor`'s zone-tap
-/// pattern) so you can arrange whatever's currently open into that layout
-/// without first building a whole Workspace. Assignments made here are kept
-/// in `assignmentsByLayout` for the lifetime of this view (which itself lives
-/// for the app's session — see `WorkspacePickerWindowController`'s
-/// lazy-create-once pattern) so picking the same layout again later
-/// remembers your last picks.
+/// flag), with no apps attached. Clicking one applies it immediately —
+/// z-order/sticky-fills whatever's currently open, exactly like clicking a
+/// layout in the menu bar. (V0.10: this used to open a per-zone
+/// app-assignment editor first — reusing `SlotAssignmentEditor` — but a
+/// `.sheet()` presented over this panel's borderless `NSPanel` didn't
+/// reliably dismiss, and the extra step was more friction than a quick-switch
+/// tool should have anyway. Reverted to instant-apply.)
 ///
 /// Both rows are fixed at 2 ROWS of tiles that scroll horizontally
 /// (`LazyHGrid` in a `ScrollView(.horizontal)`) rather than a vertical grid
@@ -28,11 +27,6 @@ struct WorkspaceQuickPickerView: View {
     let onSelect: (UUID) -> Void
     let onApplyLayout: (CustomLayout, [WorkspaceSlotAssignment]) -> Void
     let onDismiss: () -> Void
-
-    /// Non-nil while Row 2 is showing the per-zone app editor for this layout
-    /// instead of the layout list.
-    @State private var editingLayout: CustomLayout?
-    @State private var assignmentsByLayout: [UUID: [WorkspaceSlotAssignment]] = [:]
 
     private var pickerWorkspaces: [Workspace] {
         workspaceStore.workspaces.filter { $0.showInQuickPicker }
@@ -68,16 +62,7 @@ struct WorkspaceQuickPickerView: View {
         .frame(width: contentWidth + 32)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator))
-        .onExitCommand {
-            // Escape backs out of the app-assignment editor first, and only
-            // dismisses the whole panel on a second press — mirrors the
-            // "back" chevron so Esc never feels like it skipped a step.
-            if editingLayout != nil {
-                editingLayout = nil
-            } else {
-                onDismiss()
-            }
-        }
+        .onExitCommand { onDismiss() }
     }
 
     // MARK: - Row 1: Pinned Workspaces
@@ -137,18 +122,9 @@ struct WorkspaceQuickPickerView: View {
         .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    // MARK: - Row 2: Layouts / ad-hoc app assignment
+    // MARK: - Row 2: Layouts
 
-    @ViewBuilder
     private var layoutSection: some View {
-        if let layout = editingLayout {
-            layoutAssignmentEditor(for: layout)
-        } else {
-            layoutListSection
-        }
-    }
-
-    private var layoutListSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("workspace.picker.layouts_section")
                 .font(.headline)
@@ -171,7 +147,11 @@ struct WorkspaceQuickPickerView: View {
     }
 
     private func layoutTile(_ layout: CustomLayout) -> some View {
-        Button(action: { editingLayout = layout }) {
+        // Apply immediately — no per-zone assignment step. `onApplyLayout`
+        // with empty assignments falls through to the engine's normal
+        // z-order/sticky fill of whatever's currently open, same as a
+        // menu-bar or hotkey layout fire.
+        Button(action: { onApplyLayout(layout, []) }) {
             VStack(spacing: 4) {
                 LayoutThumbnail(layout: layout, size: CGSize(width: 56, height: 35))
                 Text(layout.name)
@@ -183,45 +163,5 @@ struct WorkspaceQuickPickerView: View {
         }
         .buttonStyle(.plain)
         .contentShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func layoutAssignmentEditor(for layout: CustomLayout) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Button(action: { editingLayout = nil }) {
-                    Label("workspace.picker.back", systemImage: "chevron.left")
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                Text(layout.name)
-                    .font(.headline)
-                Spacer()
-                // Balances the back button so the title stays visually
-                // centered instead of drifting toward the trailing edge.
-                Label("workspace.picker.back", systemImage: "chevron.left")
-                    .labelStyle(.iconOnly)
-                    .opacity(0)
-            }
-            SlotAssignmentEditor(
-                slotAssignments: assignmentsBinding(for: layout.id),
-                layout: layout
-            )
-            Button(action: { applyLayout(layout) }) {
-                Text("workspace.picker.apply")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    private func assignmentsBinding(for layoutID: UUID) -> Binding<[WorkspaceSlotAssignment]> {
-        Binding(
-            get: { assignmentsByLayout[layoutID] ?? [] },
-            set: { assignmentsByLayout[layoutID] = $0 }
-        )
-    }
-
-    private func applyLayout(_ layout: CustomLayout) {
-        onApplyLayout(layout, assignmentsByLayout[layout.id] ?? [])
     }
 }
