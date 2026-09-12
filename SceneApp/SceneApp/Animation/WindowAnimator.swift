@@ -51,9 +51,14 @@ final class WindowAnimator: WindowFrameSink {
     /// This run's real destination per window — kept separately from the
     /// interpolator's own state because `tickFromDisplayLink()` needs it
     /// *after* `runner.isFinished` to run a corrective settle pass (see
-    /// `settleFinalFrames()`), by which point the interpolator itself has
+    /// `settleFinalFramesAsync()`), by which point the interpolator itself has
     /// nothing left to report.
     private var currentTargets: [CGWindowID: CGRect] = [:]
+    /// Bumped whenever a new `animate()` run starts, so any settle-pass
+    /// `Task`s still in flight from a PREVIOUS run (see
+    /// `settleFinalFramesAsync`) recognize they're superseded and stop
+    /// writing frames instead of fighting the new run for the same windows.
+    private var settleGeneration = 0
 
     private struct AnimationRunState {
         let layoutID: UUID
@@ -138,6 +143,10 @@ final class WindowAnimator: WindowFrameSink {
             ))
             currentRun = nil
         }
+
+        // Invalidate any settle-pass Tasks still retrying from a previous run
+        // — see `settleGeneration`'s doc comment.
+        settleGeneration += 1
 
         // Refresh the live window registry. Animations always replace the prior set.
         byID.removeAll()
@@ -265,7 +274,9 @@ final class WindowAnimator: WindowFrameSink {
                 ))
                 currentRun = nil
             }
-            settleFinalFrames()
+            let windowsSnapshot = byID
+            let targetsSnapshot = currentTargets
+            settleFinalFramesAsync(windows: windowsSnapshot, targets: targetsSnapshot)
             stopDisplayLink()
             byID.removeAll()
             lastWritten.removeAll()
@@ -284,26 +295,50 @@ final class WindowAnimator: WindowFrameSink {
     /// path never had an equivalent, so on a typical ≤6-window Workspace
     /// (animation's default) a layout could visibly land short and require
     /// re-firing the same layout/workspace to actually finish converging.
-    private func settleFinalFrames(maxAttempts: Int = 5, tolerance: CGFloat = 5) {
-        for (id, target) in currentTargets {
-            guard let window = byID[id] else { continue }
-            var attempt = 0
-            while attempt < maxAttempts, !rectsApproxEqual(window.frame, target, tolerance: tolerance) {
-                let current = window.frame
-                let corrected = CGRect(
-                    x: target.origin.x + (target.origin.x - current.origin.x),
-                    y: target.origin.y + (target.origin.y - current.origin.y),
-                    width: target.width + (target.width - current.width),
-                    height: target.height + (target.height - current.height)
-                )
-                do {
-                    try window.setFrame(corrected)
-                } catch {
-                    log.error("settle setFrame failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
-                    currentRun?.setFrameFailures += 1
-                    break
+    ///
+    /// This runs each window's correction loop as its own `Task` with a real
+    /// delay between attempts — not a tight synchronous loop. An Electron
+    /// window's resize handling is often genuinely asynchronous (it doesn't
+    /// finish applying a frame before returning control from the AX call),
+    /// so reading `window.frame` again immediately can still see the OLD
+    /// value; every correction attempt then computes its overshoot from a
+    /// stale baseline and makes no real progress. This was observed as
+    /// needing to re-click the same layout up to `maxAttempts` times to
+    /// actually converge — each click's own animation only ever "used" one
+    /// effective correction, with human reaction time between clicks
+    /// providing the settle delay this synchronous version never gave it.
+    private func settleFinalFramesAsync(
+        windows: [CGWindowID: any SceneWindowRef],
+        targets: [CGWindowID: CGRect],
+        maxAttempts: Int = 5,
+        tolerance: CGFloat = 5,
+        retryDelayMs: UInt64 = 60
+    ) {
+        let generation = settleGeneration
+        for (id, target) in targets {
+            guard let window = windows[id] else { continue }
+            Task { @MainActor [weak self] in
+                var attempt = 0
+                while attempt < maxAttempts,
+                      let self, self.settleGeneration == generation,
+                      !rectsApproxEqual(window.frame, target, tolerance: tolerance)
+                {
+                    let current = window.frame
+                    let corrected = CGRect(
+                        x: target.origin.x + (target.origin.x - current.origin.x),
+                        y: target.origin.y + (target.origin.y - current.origin.y),
+                        width: target.width + (target.width - current.width),
+                        height: target.height + (target.height - current.height)
+                    )
+                    do {
+                        try window.setFrame(corrected)
+                    } catch {
+                        self.log.error("settle setFrame failed for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+                        break
+                    }
+                    attempt += 1
+                    try? await Task.sleep(for: .milliseconds(retryDelayMs))
                 }
-                attempt += 1
             }
         }
     }
