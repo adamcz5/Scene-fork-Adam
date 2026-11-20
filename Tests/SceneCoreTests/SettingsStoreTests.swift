@@ -209,4 +209,43 @@ extension SettingsStoreTests {
         XCTAssertEqual(reloaded.appSwitcher, config)
         token.cancel()
     }
+
+    // MARK: - V0.10 Spotlight
+
+    func testFreshStoreDefaultsSpotlightDisabled() throws {
+        let store = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(store.spotlight, SpotlightConfig.default)
+        XCTAssertFalse(store.spotlight.enabled)
+    }
+
+    func testV5FileMigratesToV6WithDefaultSpotlight() throws {
+        // Simulate a pre-Spotlight settings file (version 5, no spotlight field).
+        let v5json = #"""
+        {"version":5,"animation":{"enabled":true,"durationMs":250,"easing":"easeOut"},"dragSwap":{"enabled":true,"distanceThresholdPt":40},"diagnosticsEnabled":true,"quickPickerHotkey":null,"appSwitcher":{"enabled":false,"entries":[]}}
+        """#.data(using: .utf8)!
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try v5json.write(to: fileURL)
+        let store = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(store.spotlight, SpotlightConfig.default, "V5 → V6 migration defaults spotlight = .default")
+        let raw = try Data(contentsOf: fileURL)
+        let rewritten = String(data: raw, encoding: .utf8) ?? ""
+        XCTAssertTrue(rewritten.contains("\"version\" : \(SettingsStore.currentVersion)"))
+        XCTAssertTrue(rewritten.contains("spotlight"))
+    }
+
+    func testSetSpotlightPersistsAndReloadsAndNotifies() throws {
+        let store = try SettingsStore(fileURL: fileURL)
+        var fired = 0
+        let token = store.onChange { fired += 1 }
+        let config = SpotlightConfig(enabled: true, scope: .activeApp, idleDelaySeconds: 4)
+        try store.setSpotlight(config)
+        XCTAssertEqual(store.spotlight, config)
+        XCTAssertEqual(fired, 1)
+
+        let reloaded = try SettingsStore(fileURL: fileURL)
+        XCTAssertEqual(reloaded.spotlight, config)
+        token.cancel()
+    }
 }

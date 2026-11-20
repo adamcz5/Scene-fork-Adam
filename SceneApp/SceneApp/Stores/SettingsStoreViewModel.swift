@@ -14,6 +14,7 @@ final class SettingsStoreViewModel: ObservableObject {
     @Published private(set) var diagnosticsEnabled: Bool
     @Published private(set) var quickPickerHotkey: HotkeyBinding?
     @Published private(set) var appSwitcher: AppSwitcherConfig
+    @Published private(set) var spotlight: SpotlightConfig
     /// Set by `AppDelegate` so toggling `diagnosticsEnabled` from the
     /// AboutTab can drain the writer + delete artifacts (off) or recreate
     /// the writer with a fresh salt (on). Async because disable awaits
@@ -28,6 +29,7 @@ final class SettingsStoreViewModel: ObservableObject {
         self.diagnosticsEnabled = store.diagnosticsEnabled
         self.quickPickerHotkey = store.quickPickerHotkey
         self.appSwitcher = store.appSwitcher
+        self.spotlight = store.spotlight
         let weakSelf = WeakBox(self)
         self.token = store.onChange {
             Task { @MainActor in
@@ -37,6 +39,7 @@ final class SettingsStoreViewModel: ObservableObject {
                 strong.diagnosticsEnabled = strong.store.diagnosticsEnabled
                 strong.quickPickerHotkey = strong.store.quickPickerHotkey
                 strong.appSwitcher = strong.store.appSwitcher
+                strong.spotlight = strong.store.spotlight
             }
         }
     }

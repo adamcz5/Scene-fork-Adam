@@ -20,21 +20,24 @@ public final class SettingsStore {
     public private(set) var quickPickerHotkey: HotkeyBinding?
     /// V0.9 filtered ⌥Tab app switcher (see `AppSwitcherConfig`).
     public private(set) var appSwitcher: AppSwitcherConfig
+    /// V0.10 dim+blur overlay (see `SpotlightConfig`).
+    public private(set) var spotlight: SpotlightConfig
     private let fileURL: URL
     private var observers: [UUID: () -> Void] = [:]
 
-    public static let currentVersion = 5
+    public static let currentVersion = 6
 
     public init(fileURL: URL) throws {
         self.fileURL = fileURL
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
-            let (animation, dragSwap, diagnosticsEnabled, quickPickerHotkey, appSwitcher, needsRewrite) = try Self.decodeWithMigration(data: data)
+            let (animation, dragSwap, diagnosticsEnabled, quickPickerHotkey, appSwitcher, spotlight, needsRewrite) = try Self.decodeWithMigration(data: data)
             self.animation = animation
             self.dragSwap = dragSwap
             self.diagnosticsEnabled = diagnosticsEnabled
             self.quickPickerHotkey = quickPickerHotkey
             self.appSwitcher = appSwitcher
+            self.spotlight = spotlight
             if needsRewrite { try persist() }
         } else {
             self.animation = .default
@@ -42,6 +45,7 @@ public final class SettingsStore {
             self.diagnosticsEnabled = true
             self.quickPickerHotkey = nil
             self.appSwitcher = .default
+            self.spotlight = .default
             try persist()
         }
     }
@@ -76,6 +80,12 @@ public final class SettingsStore {
         for h in observers.values { h() }
     }
 
+    public func setSpotlight(_ config: SpotlightConfig) throws {
+        spotlight = config
+        try persist()
+        for h in observers.values { h() }
+    }
+
     public func onChange(_ handler: @escaping () -> Void) -> Cancellable {
         let token = UUID()
         observers[token] = handler
@@ -89,7 +99,8 @@ public final class SettingsStore {
             dragSwap: dragSwap,
             diagnosticsEnabled: diagnosticsEnabled,
             quickPickerHotkey: quickPickerHotkey,
-            appSwitcher: appSwitcher
+            appSwitcher: appSwitcher,
+            spotlight: spotlight
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -103,26 +114,29 @@ public final class SettingsStore {
 
     /// Decodes whatever schema version is on disk; returns `needsRewrite=true`
     /// if the file must be upgraded and persisted back.
-    private static func decodeWithMigration(data: Data) throws -> (AnimationConfig, DragSwapConfig, Bool, HotkeyBinding?, AppSwitcherConfig, Bool) {
+    private static func decodeWithMigration(data: Data) throws -> (AnimationConfig, DragSwapConfig, Bool, HotkeyBinding?, AppSwitcherConfig, SpotlightConfig, Bool) {
         let versionProbe = try JSONDecoder().decode(VersionProbe.self, from: data)
         switch versionProbe.version {
+        case 6:
+            let v6 = try JSONDecoder().decode(StoredFile.self, from: data)
+            return (v6.animation, v6.dragSwap, v6.diagnosticsEnabled, v6.quickPickerHotkey, v6.appSwitcher, v6.spotlight, false)
         case 5:
-            let v5 = try JSONDecoder().decode(StoredFile.self, from: data)
-            return (v5.animation, v5.dragSwap, v5.diagnosticsEnabled, v5.quickPickerHotkey, v5.appSwitcher, false)
+            let v5 = try JSONDecoder().decode(StoredFileV5.self, from: data)
+            return (v5.animation, v5.dragSwap, v5.diagnosticsEnabled, v5.quickPickerHotkey, v5.appSwitcher, .default, true)
         case 4:
             let v4 = try JSONDecoder().decode(StoredFileV4.self, from: data)
-            return (v4.animation, v4.dragSwap, v4.diagnosticsEnabled, v4.quickPickerHotkey, .default, true)
+            return (v4.animation, v4.dragSwap, v4.diagnosticsEnabled, v4.quickPickerHotkey, .default, .default, true)
         case 3:
             let v3 = try JSONDecoder().decode(StoredFileV3.self, from: data)
-            return (v3.animation, v3.dragSwap, v3.diagnosticsEnabled, nil, .default, true)
+            return (v3.animation, v3.dragSwap, v3.diagnosticsEnabled, nil, .default, .default, true)
         case 2:
             let v2 = try JSONDecoder().decode(StoredFileV2.self, from: data)
             // Default V0.6 diagnostics ON for upgraded users — they can
             // still opt out via the AboutTab toggle.
-            return (v2.animation, v2.dragSwap, true, nil, .default, true)
+            return (v2.animation, v2.dragSwap, true, nil, .default, .default, true)
         case 1:
             let v1 = try JSONDecoder().decode(StoredFileV1.self, from: data)
-            return (v1.animation, .default, true, nil, .default, true)
+            return (v1.animation, .default, true, nil, .default, .default, true)
         default:
             throw DecodingError.dataCorrupted(.init(
                 codingPath: [],
@@ -134,6 +148,16 @@ public final class SettingsStore {
     private struct VersionProbe: Codable { let version: Int }
 
     private struct StoredFile: Codable {
+        let version: Int
+        let animation: AnimationConfig
+        let dragSwap: DragSwapConfig
+        let diagnosticsEnabled: Bool
+        let quickPickerHotkey: HotkeyBinding?
+        let appSwitcher: AppSwitcherConfig
+        let spotlight: SpotlightConfig
+    }
+
+    private struct StoredFileV5: Codable {
         let version: Int
         let animation: AnimationConfig
         let dragSwap: DragSwapConfig

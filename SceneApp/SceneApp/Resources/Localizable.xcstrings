@@ -5099,6 +5099,66 @@
         "en": { "stringUnit": { "state": "translated", "value": "Hold ⌥ and tap Tab to cycle only through the apps listed above; release ⌥ to switch. ⌥⇧Tab cycles backward. For an app with multiple windows, ⌥↓/⌥↑ picks which one (requires Accessibility permission). Leaves ⌘Tab untouched." } }
       }
     },
+    "interaction.spotlight.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Spotlight" } }
+      }
+    },
+    "interaction.spotlight.enable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim everything but the active window" } }
+      }
+    },
+    "interaction.spotlight.scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep undimmed" } }
+      }
+    },
+    "interaction.spotlight.scope.window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Just the active window" } }
+      }
+    },
+    "interaction.spotlight.scope.app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All of the active app" } }
+      }
+    },
+    "interaction.spotlight.delay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delay before dimming" } }
+      }
+    },
+    "interaction.spotlight.delay.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fast" } }
+      }
+    },
+    "interaction.spotlight.delay.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Slow" } }
+      }
+    },
+    "interaction.spotlight.delay.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%.1fs" } }
+      }
+    },
+    "interaction.spotlight.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "After you stop switching windows for the delay above, everything except the active window (or app) dims and blurs. Switching away clears it instantly. Works on the windowed desktop only — not Spaces or full-screen apps. Requires Accessibility permission." } }
+      }
+    },
     "layouts.editor.quick_picker.show": {
       "extractionState": "manual",
       "localizations": {

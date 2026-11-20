@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         onPermissionChange: { [weak self] granted in
             DispatchQueue.main.async {
                 self?.permissionGranted = granted
+                self?.spotlightController.setPermissionGranted(granted)
             }
         },
         diagnostics: diagnostics.sink
@@ -93,6 +94,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @MainActor
     private lazy var appSwitcherController = AppSwitcherController(hud: AppSwitcherHUDWindowController())
     private var appSwitcherSettingsObserver: SceneCancellable?
+
+    /// V0.10 Spotlight (dim+blur overlay). Unlike the app switcher, this DOES
+    /// need Accessibility — it reads the frontmost app/window via AX — so its
+    /// enabled state is gated on both `SettingsStore.spotlight.enabled` and
+    /// `permissionGranted`, mirrored into it from the same
+    /// `onPermissionChange` callback that updates this delegate's own
+    /// published flag.
+    @MainActor
+    private lazy var spotlightController = SpotlightController()
+    private var spotlightSettingsObserver: SceneCancellable?
 
     /// Single shared instance — re-shown on subsequent "Settings…" clicks
     /// rather than recreated, so view-model state survives close/reopen.
@@ -316,6 +327,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         appSwitcherSettingsObserver = settingsStore.onChange { [weak self] in
             guard let self else { return }
             Task { @MainActor in self.appSwitcherController.configure(self.settingsStore.appSwitcher) }
+        }
+
+        // V0.10 Spotlight — configured here too so a config with
+        // `enabled: true` left over from a previous launch starts right
+        // away; `setPermissionGranted` above handles the AX side whenever
+        // that changes later.
+        spotlightController.configure(settingsStore.spotlight)
+        spotlightSettingsObserver = settingsStore.onChange { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.spotlightController.configure(self.settingsStore.spotlight) }
         }
 
         // Starts permission polling + notification helper + hotkey registrar.

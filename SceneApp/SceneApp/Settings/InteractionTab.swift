@@ -79,6 +79,38 @@ struct InteractionTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("interaction.spotlight.section") {
+                Toggle("interaction.spotlight.enable", isOn: spotlightEnabledBinding)
+
+                Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
+                    Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
+                    Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
+                }
+                .pickerStyle(.segmented)
+                .disabled(!settingsVM.spotlight.enabled)
+
+                Slider(
+                    value: spotlightDelayBinding,
+                    in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
+                    step: 0.5
+                ) {
+                    Text("interaction.spotlight.delay")
+                } minimumValueLabel: {
+                    Text("interaction.spotlight.delay.min")
+                } maximumValueLabel: {
+                    Text("interaction.spotlight.delay.max")
+                }
+                .disabled(!settingsVM.spotlight.enabled)
+
+                Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                Text("interaction.spotlight.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
     }
@@ -190,6 +222,36 @@ struct InteractionTab: View {
             set: { v in
                 let c = settingsVM.appSwitcher
                 try? settingsVM.store.setAppSwitcher(AppSwitcherConfig(enabled: c.enabled, entries: v))
+            }
+        )
+    }
+
+    private var spotlightEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settingsVM.spotlight.enabled },
+            set: { v in
+                let c = settingsVM.spotlight
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: v, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds))
+            }
+        )
+    }
+
+    private var spotlightScopeBinding: Binding<SpotlightScope> {
+        Binding(
+            get: { settingsVM.spotlight.scope },
+            set: { v in
+                let c = settingsVM.spotlight
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: v, idleDelaySeconds: c.idleDelaySeconds))
+            }
+        )
+    }
+
+    private var spotlightDelayBinding: Binding<Double> {
+        Binding(
+            get: { settingsVM.spotlight.idleDelaySeconds },
+            set: { v in
+                let c = settingsVM.spotlight
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: v))
             }
         )
     }
