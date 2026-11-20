@@ -242,29 +242,22 @@ struct MenuBarContentView: View {
         .buttonStyle(MenuRowButtonStyle())
     }
 
-    /// Cycles the EXCLUSION MODE axis only (single app anywhere vs. one app
+    /// Toggles the EXCLUSION MODE axis only (single app anywhere vs. one app
     /// per monitor) — independent of whether Dim is currently on, same as
-    /// `stickyModeRow` staying clickable regardless of Free Mode.
+    /// `stickyModeRow` staying clickable regardless of Free Mode. A plain
+    /// checkmark toggle, same as `workspaceRow`/`layoutRow`/Free Mode above —
+    /// a PREVIOUS version paired a static (non-functional) decorative icon
+    /// with separate cycling trailing text, which read as three different
+    /// controls for what is really one on/off switch. Checked = per-monitor.
     private var dimExclusionModeRow: some View {
-        Button(action: cycleDimExclusionMode) {
+        Button(action: toggleDimExclusionMode) {
             HStack(spacing: 6) {
-                Image(systemName: "rectangle.on.rectangle")
-                    .foregroundStyle(.secondary)
+                checkmarkColumn(settingsVM.spotlight.exclusionMode == .perMonitor)
                 Text("menu.dim.exclusion_mode")
                 Spacer()
-                Text(dimExclusionModeValueLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .buttonStyle(MenuRowButtonStyle())
-    }
-
-    private var dimExclusionModeValueLabel: String {
-        switch settingsVM.spotlight.exclusionMode {
-        case .single:     return String(localized: "interaction.spotlight.exclusion_mode.single")
-        case .perMonitor: return String(localized: "interaction.spotlight.exclusion_mode.per_monitor")
-        }
     }
 
     private func toggleDimEnabled() {
@@ -274,7 +267,7 @@ struct MenuBarContentView: View {
         )
     }
 
-    private func cycleDimExclusionMode() {
+    private func toggleDimExclusionMode() {
         let c = settingsVM.spotlight
         let next: SpotlightExclusionMode = c.exclusionMode == .single ? .perMonitor : .single
         try? settingsVM.store.setSpotlight(

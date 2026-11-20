@@ -5,23 +5,41 @@ struct InteractionTab: View {
     @EnvironmentObject var settingsVM: SettingsStoreViewModel
     @State private var previewToggle: Bool = false
 
+    /// Replaced the earlier `Form { Section { ... } }` layout: on this
+    /// window, `Form`'s native macOS section chrome rendered as plain
+    /// running text with no visible box/border between sections (and no
+    /// scrolling once content overflowed) — reported back as "I cannot
+    /// scroll" / sections not reading as separate blocks. A plain
+    /// `ScrollView` + explicitly-drawn `card`/`subBlock` boxes below
+    /// guarantees both: scrolling is never in question, and every section
+    /// (and, for the bigger ones, every sub-block within it) gets its own
+    /// visible rounded box with a real title, not just an indent change.
     var body: some View {
-        Form {
-            Section("interaction.animation.section") {
-                Text("interaction.animation.section.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                animationCard
+                dragSwapCard
+                appSwitcherCard
+                spotlightCard
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-                Toggle("interaction.animation.enable", isOn: enabledBinding)
+    private var animationCard: some View {
+        card("interaction.animation.section", hint: "interaction.animation.section.hint") {
+            Toggle("interaction.animation.enable", isOn: enabledBinding)
 
-                Picker("interaction.animation.easing", selection: easingBinding) {
-                    ForEach(EasingCurve.allCases, id: \.self) { curve in
-                        Text(label(for: curve)).tag(curve)
-                    }
+            Picker("interaction.animation.easing", selection: easingBinding) {
+                ForEach(EasingCurve.allCases, id: \.self) { curve in
+                    Text(label(for: curve)).tag(curve)
                 }
-                .pickerStyle(.segmented)
-                .disabled(!settingsVM.animation.enabled)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!settingsVM.animation.enabled)
 
+            VStack(alignment: .leading, spacing: 4) {
                 Slider(value: durationBinding, in: 100...500, step: 25) {
                     Text("interaction.animation.duration")
                 } minimumValueLabel: {
@@ -34,19 +52,15 @@ struct InteractionTab: View {
                 Text(String(format: String(localized: "interaction.animation.duration.value"), settingsVM.animation.durationMs))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-
-                previewSection
             }
 
-            Section("interaction.drag_swap.section") {
-                Text("interaction.drag_swap.section.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            previewSection
+        }
+    }
 
-                Text("interaction.drag_swap.subsection.stickiness")
-                    .font(.caption)
-                    .bold()
-                    .foregroundStyle(.secondary)
+    private var dragSwapCard: some View {
+        card("interaction.drag_swap.section", hint: "interaction.drag_swap.section.hint") {
+            subBlock("interaction.drag_swap.subsection.stickiness") {
                 Picker("interaction.drag_swap.mode", selection: stickyModeBinding) {
                     Text("interaction.drag_swap.mode.off").tag(StickyModeOption.off)
                     Text("interaction.drag_swap.mode.always").tag(StickyModeOption.always)
@@ -66,13 +80,9 @@ struct InteractionTab: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+            }
 
-                Divider().padding(.vertical, 2)
-
-                Text("interaction.drag_swap.subsection.threshold")
-                    .font(.caption)
-                    .bold()
-                    .foregroundStyle(.secondary)
+            subBlock("interaction.drag_swap.subsection.threshold") {
                 Slider(value: dragSwapThresholdBinding, in: 10...100, step: 5) {
                     Text("interaction.drag_swap.threshold")
                 } minimumValueLabel: {
@@ -85,113 +95,134 @@ struct InteractionTab: View {
                 Text(String(format: String(localized: "interaction.drag_swap.threshold.value"), Int(settingsVM.dragSwap.distanceThresholdPt)))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-
-                Text("interaction.drag_swap.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
-            Section("interaction.app_switcher.section") {
-                Text("interaction.app_switcher.section.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Toggle("interaction.app_switcher.enable", isOn: appSwitcherEnabledBinding)
-                AppSwitcherEntriesEditor(entries: appSwitcherEntriesBinding)
-                Text("interaction.app_switcher.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            spotlightSection
+            Text("interaction.drag_swap.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .padding()
     }
 
-    /// Spotlight gets its own, larger section (per user ask) — it's grown to
+    private var appSwitcherCard: some View {
+        card("interaction.app_switcher.section", hint: "interaction.app_switcher.section.hint") {
+            Toggle("interaction.app_switcher.enable", isOn: appSwitcherEnabledBinding)
+            AppSwitcherEntriesEditor(entries: appSwitcherEntriesBinding)
+            Text("interaction.app_switcher.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Spotlight gets its own, larger card (per user ask) — it's grown to
     /// cover exclusion scope (window vs. app) AND, independently, how many
     /// exclusion targets exist at once when multiple displays are connected
-    /// (single vs. per-monitor). Each sub-control has its own short label so
-    /// the two axes don't read as one setting.
-    @ViewBuilder
-    private var spotlightSection: some View {
-        Section("interaction.spotlight.section") {
-            Text("interaction.spotlight.section.hint")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+    /// (single vs. per-monitor). Each axis gets its own labeled sub-block so
+    /// they don't read as one setting.
+    private var spotlightCard: some View {
+        card("interaction.spotlight.section", hint: "interaction.spotlight.section.hint") {
             Toggle("interaction.spotlight.enable", isOn: spotlightEnabledBinding)
 
-            Divider().padding(.vertical, 2)
-
-            Text("interaction.spotlight.subsection.scope")
-                .font(.caption)
-                .bold()
-                .foregroundStyle(.secondary)
-            Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
-                Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
-                Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
-            }
-            .pickerStyle(.segmented)
-            .disabled(!settingsVM.spotlight.enabled)
-            Text("interaction.spotlight.scope.hint")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Divider().padding(.vertical, 2)
-
-            Text("interaction.spotlight.subsection.monitors")
-                .font(.caption)
-                .bold()
-                .foregroundStyle(.secondary)
-            Picker("interaction.spotlight.exclusion_mode", selection: spotlightExclusionModeBinding) {
-                Text("interaction.spotlight.exclusion_mode.single").tag(SpotlightExclusionMode.single)
-                Text("interaction.spotlight.exclusion_mode.per_monitor").tag(SpotlightExclusionMode.perMonitor)
-            }
-            .pickerStyle(.segmented)
-            .disabled(!settingsVM.spotlight.enabled)
-            Text("interaction.spotlight.exclusion_mode.hint")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Divider().padding(.vertical, 2)
-
-            Text("interaction.spotlight.subsection.delay")
-                .font(.caption)
-                .bold()
-                .foregroundStyle(.secondary)
-            Slider(
-                value: spotlightDelayBinding,
-                in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
-                step: 0.5
-            ) {
-                Text("interaction.spotlight.delay")
-            } minimumValueLabel: {
-                Text("interaction.spotlight.delay.min")
-            } maximumValueLabel: {
-                Text("interaction.spotlight.delay.max")
-            }
-            .disabled(!settingsVM.spotlight.enabled)
-
-            Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-
-            Divider().padding(.vertical, 2)
-
-            Text("interaction.spotlight.subsection.experimental")
-                .font(.caption)
-                .bold()
-                .foregroundStyle(.secondary)
-            Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightDimBrowserChromeBinding)
+            subBlock("interaction.spotlight.subsection.scope", hint: "interaction.spotlight.scope.hint") {
+                Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
+                    Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
+                    Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
+                }
+                .pickerStyle(.segmented)
                 .disabled(!settingsVM.spotlight.enabled)
-            Text("interaction.spotlight.dim_browser_chrome.hint")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            }
+
+            subBlock("interaction.spotlight.subsection.monitors", hint: "interaction.spotlight.exclusion_mode.hint") {
+                Picker("interaction.spotlight.exclusion_mode", selection: spotlightExclusionModeBinding) {
+                    Text("interaction.spotlight.exclusion_mode.single").tag(SpotlightExclusionMode.single)
+                    Text("interaction.spotlight.exclusion_mode.per_monitor").tag(SpotlightExclusionMode.perMonitor)
+                }
+                .pickerStyle(.segmented)
+                .disabled(!settingsVM.spotlight.enabled)
+            }
+
+            subBlock("interaction.spotlight.subsection.delay") {
+                Slider(
+                    value: spotlightDelayBinding,
+                    in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
+                    step: 0.5
+                ) {
+                    Text("interaction.spotlight.delay")
+                } minimumValueLabel: {
+                    Text("interaction.spotlight.delay.min")
+                } maximumValueLabel: {
+                    Text("interaction.spotlight.delay.max")
+                }
+                .disabled(!settingsVM.spotlight.enabled)
+
+                Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
+                Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightDimBrowserChromeBinding)
+                    .disabled(!settingsVM.spotlight.enabled)
+            }
 
             Text("interaction.spotlight.hint")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Top-level section box: title, optional hint, then whatever controls
+    /// the caller passes — every card gets the same rounded, filled
+    /// background so sections read as distinct blocks rather than a single
+    /// continuous list.
+    @ViewBuilder
+    private func card<Content: View>(
+        _ title: LocalizedStringKey,
+        hint: LocalizedStringKey? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title3)
+                    .bold()
+                if let hint {
+                    Text(hint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+    }
+
+    /// Nested box inside a bigger card (Drag & Swap, Spotlight), for grouping
+    /// one labeled axis of settings (e.g. "Stickiness" vs. "Drag Distance")
+    /// so a card with several unrelated controls doesn't read as one list.
+    @ViewBuilder
+    private func subBlock<Content: View>(
+        _ title: LocalizedStringKey,
+        hint: LocalizedStringKey? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .bold()
+                .foregroundStyle(.secondary)
+            content()
+            if let hint {
+                Text(hint)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
     }
 
     private var previewSection: some View {

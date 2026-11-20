@@ -5130,7 +5130,7 @@
     "menu.dim.exclusion_mode": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Across monitors" } }
+        "en": { "stringUnit": { "state": "translated", "value": "One app per monitor" } }
       }
     },
     "workspace.picker.pinned_section": {
