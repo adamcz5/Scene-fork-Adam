@@ -9,6 +9,21 @@ public enum SpotlightScope: String, Codable, CaseIterable, Sendable {
     case activeApp
 }
 
+/// How many exclusion targets Spotlight keeps undimmed at once, relevant
+/// only when more than one display is connected.
+public enum SpotlightExclusionMode: String, Codable, CaseIterable, Sendable {
+    /// One exclusion target total — the single system-wide frontmost
+    /// window/app (per `scope`). Every OTHER screen dims completely, even
+    /// where that screen's own last-active window sits.
+    case single
+    /// One exclusion target PER screen — each monitor keeps its own most
+    /// recently active window/app (per `scope`) undimmed, independent of
+    /// which monitor currently holds the system-wide frontmost window. E.g.
+    /// Slack stays undimmed on monitor 1 while you're focused on Chrome on
+    /// monitor 2.
+    case perMonitor
+}
+
 /// User-tunable settings for "Spotlight" — a dim+blur overlay that darkens
 /// everything except the window (or app) you're currently working in.
 ///
@@ -32,6 +47,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// to `[minIdleDelaySeconds, maxIdleDelaySeconds]` by the Settings slider;
     /// stored as-is here so a value from a future wider range still round-trips.
     public var idleDelaySeconds: Double
+    public var exclusionMode: SpotlightExclusionMode
+    /// EXPERIMENTAL (default off): also re-darken a browser's own tab
+    /// strip/toolbar/bookmark bar inside an otherwise-undimmed window. See
+    /// `BrowserChromeDetector` in SceneApp for the heuristic and its limits —
+    /// this is best-effort and silently does nothing for browsers/windows it
+    /// doesn't recognize.
+    public var dimBrowserChrome: Bool
 
     public static let minIdleDelaySeconds: Double = 1
     public static let maxIdleDelaySeconds: Double = 8
@@ -46,26 +68,37 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         idleDelaySeconds: defaultIdleDelaySeconds
     )
 
-    public init(enabled: Bool, scope: SpotlightScope, idleDelaySeconds: Double) {
+    public init(
+        enabled: Bool,
+        scope: SpotlightScope,
+        idleDelaySeconds: Double,
+        exclusionMode: SpotlightExclusionMode = .single,
+        dimBrowserChrome: Bool = false
+    ) {
         self.enabled = enabled
         self.scope = scope
         self.idleDelaySeconds = idleDelaySeconds
+        self.exclusionMode = exclusionMode
+        self.dimBrowserChrome = dimBrowserChrome
     }
 
     private enum CodingKeys: String, CodingKey {
-        case enabled, scope, idleDelaySeconds
+        case enabled, scope, idleDelaySeconds, exclusionMode, dimBrowserChrome
     }
 
-    /// All three fields decode with fallbacks so a `SettingsStore` migration
-    /// from a pre-Spotlight schema (no `spotlight` key at all) can still
-    /// decode a bare `{}` into `.default` if ever needed, and so a
-    /// partially-written file (crash mid-write, hand edit) degrades to
-    /// defaults field-by-field instead of failing the whole decode.
+    /// All fields decode with fallbacks so a `SettingsStore` migration from a
+    /// pre-Spotlight schema (no `spotlight` key at all) can still decode a
+    /// bare `{}` into `.default` if ever needed, and so a partially-written
+    /// file (crash mid-write, hand edit, or an older build's file missing a
+    /// field added later — e.g. `exclusionMode`/`dimBrowserChrome`) degrades
+    /// to defaults field-by-field instead of failing the whole decode.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
         self.scope = try c.decodeIfPresent(SpotlightScope.self, forKey: .scope) ?? .activeWindow
         self.idleDelaySeconds = try c.decodeIfPresent(Double.self, forKey: .idleDelaySeconds) ?? Self.defaultIdleDelaySeconds
+        self.exclusionMode = try c.decodeIfPresent(SpotlightExclusionMode.self, forKey: .exclusionMode) ?? .single
+        self.dimBrowserChrome = try c.decodeIfPresent(Bool.self, forKey: .dimBrowserChrome) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -73,5 +106,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(enabled, forKey: .enabled)
         try c.encode(scope, forKey: .scope)
         try c.encode(idleDelaySeconds, forKey: .idleDelaySeconds)
+        try c.encode(exclusionMode, forKey: .exclusionMode)
+        try c.encode(dimBrowserChrome, forKey: .dimBrowserChrome)
     }
 }

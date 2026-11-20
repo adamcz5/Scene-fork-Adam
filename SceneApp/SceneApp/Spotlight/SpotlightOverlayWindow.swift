@@ -80,17 +80,30 @@ final class SpotlightOverlayWindow: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// `excludedFrames` are in the global NS screen-coordinate system
-    /// (bottom-left origin, matching `NSScreen.frame`) — same convention as
-    /// `AXWindow.frame` everywhere else in this codebase. Converts to this
-    /// window's own local coordinates (origin at this screen's bottom-left),
-    /// which — since neither `blurView`/`tintView` override `isFlipped` —
-    /// needs only a translation, no vertical flip.
-    func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect) {
-        let merged = RectMerging.mergingOverlapping(excludedFrames)
+    /// `excludedFrames` and `reDimFrames` are in the global NS
+    /// screen-coordinate system (bottom-left origin, matching
+    /// `NSScreen.frame`) — same convention as `AXWindow.frame` everywhere
+    /// else in this codebase. Converts to this window's own local
+    /// coordinates (origin at this screen's bottom-left), which — since
+    /// neither `blurView`/`tintView` override `isFlipped` — needs only a
+    /// translation, no vertical flip.
+    ///
+    /// `reDimFrames` (experimental browser-chrome dimming) are rects EXPECTED
+    /// to sit fully inside one of `excludedFrames` — e.g. a browser's tab
+    /// strip inside its own (excluded/undimmed) window. They're added to the
+    /// even-odd path as their own, separately-merged group: each one
+    /// overlaps its containing excluded rect an odd *additional* number of
+    /// times, flipping that one sub-region back to "filled" (dimmed) while
+    /// the rest of the excluded rect stays a hole. Merging `reDimFrames`
+    /// among themselves first (same reasoning as `RectMerging`'s doc comment)
+    /// keeps two overlapping chrome rects (e.g. tab strip + address bar) from
+    /// double-toggling each other back to undimmed.
+    func updateHoles(excludedFrames: [CGRect], reDimFrames: [CGRect] = [], screenFrame: CGRect) {
+        let mergedHoles = RectMerging.mergingOverlapping(excludedFrames)
+        let mergedReDim = RectMerging.mergingOverlapping(reDimFrames)
         let path = CGMutablePath()
         path.addRect(CGRect(origin: .zero, size: screenFrame.size))
-        for frame in merged {
+        for frame in mergedHoles + mergedReDim {
             let clipped = frame.intersection(screenFrame)
             guard !clipped.isEmpty else { continue }
             let local = CGRect(

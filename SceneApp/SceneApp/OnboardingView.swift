@@ -52,6 +52,18 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 420)
 
+                // Try-this-first step, ahead of the terminal fallback below.
+                // Flipping the Accessibility toggle off/on in System Settings
+                // does NOT refresh macOS's stored record of the app after an
+                // update — it has to be removed with "–" and re-added with
+                // "+" (re-selecting Scene Fork.app) for the new binary to be
+                // recognized.
+                Text("onboarding.accessibility.remove_readd.body")
+                    .font(.caption)
+                    .bold()
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+
                 HStack(spacing: 8) {
                     Text(resetCommand)
                         .font(.system(.caption, design: .monospaced))

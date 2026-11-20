@@ -8,7 +8,20 @@ struct InteractionTab: View {
     var body: some View {
         Form {
             Section("interaction.animation.section") {
+                Text("interaction.animation.section.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("interaction.animation.enable", isOn: enabledBinding)
+
+                Picker("interaction.animation.easing", selection: easingBinding) {
+                    ForEach(EasingCurve.allCases, id: \.self) { curve in
+                        Text(label(for: curve)).tag(curve)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(!settingsVM.animation.enabled)
+
                 Slider(value: durationBinding, in: 100...500, step: 25) {
                     Text("interaction.animation.duration")
                 } minimumValueLabel: {
@@ -22,18 +35,18 @@ struct InteractionTab: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
-                Picker("interaction.animation.easing", selection: easingBinding) {
-                    ForEach(EasingCurve.allCases, id: \.self) { curve in
-                        Text(label(for: curve)).tag(curve)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .disabled(!settingsVM.animation.enabled)
-
                 previewSection
             }
 
             Section("interaction.drag_swap.section") {
+                Text("interaction.drag_swap.section.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("interaction.drag_swap.subsection.stickiness")
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(.secondary)
                 Picker("interaction.drag_swap.mode", selection: stickyModeBinding) {
                     Text("interaction.drag_swap.mode.off").tag(StickyModeOption.off)
                     Text("interaction.drag_swap.mode.always").tag(StickyModeOption.always)
@@ -54,6 +67,12 @@ struct InteractionTab: View {
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
 
+                Divider().padding(.vertical, 2)
+
+                Text("interaction.drag_swap.subsection.threshold")
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(.secondary)
                 Slider(value: dragSwapThresholdBinding, in: 10...100, step: 5) {
                     Text("interaction.drag_swap.threshold")
                 } minimumValueLabel: {
@@ -73,6 +92,9 @@ struct InteractionTab: View {
             }
 
             Section("interaction.app_switcher.section") {
+                Text("interaction.app_switcher.section.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("interaction.app_switcher.enable", isOn: appSwitcherEnabledBinding)
                 AppSwitcherEntriesEditor(entries: appSwitcherEntriesBinding)
                 Text("interaction.app_switcher.hint")
@@ -80,39 +102,96 @@ struct InteractionTab: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("interaction.spotlight.section") {
-                Toggle("interaction.spotlight.enable", isOn: spotlightEnabledBinding)
-
-                Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
-                    Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
-                    Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
-                }
-                .pickerStyle(.segmented)
-                .disabled(!settingsVM.spotlight.enabled)
-
-                Slider(
-                    value: spotlightDelayBinding,
-                    in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
-                    step: 0.5
-                ) {
-                    Text("interaction.spotlight.delay")
-                } minimumValueLabel: {
-                    Text("interaction.spotlight.delay.min")
-                } maximumValueLabel: {
-                    Text("interaction.spotlight.delay.max")
-                }
-                .disabled(!settingsVM.spotlight.enabled)
-
-                Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-
-                Text("interaction.spotlight.hint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            spotlightSection
         }
         .padding()
+    }
+
+    /// Spotlight gets its own, larger section (per user ask) — it's grown to
+    /// cover exclusion scope (window vs. app) AND, independently, how many
+    /// exclusion targets exist at once when multiple displays are connected
+    /// (single vs. per-monitor). Each sub-control has its own short label so
+    /// the two axes don't read as one setting.
+    @ViewBuilder
+    private var spotlightSection: some View {
+        Section("interaction.spotlight.section") {
+            Text("interaction.spotlight.section.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("interaction.spotlight.enable", isOn: spotlightEnabledBinding)
+
+            Divider().padding(.vertical, 2)
+
+            Text("interaction.spotlight.subsection.scope")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(.secondary)
+            Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
+                Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
+                Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!settingsVM.spotlight.enabled)
+            Text("interaction.spotlight.scope.hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Divider().padding(.vertical, 2)
+
+            Text("interaction.spotlight.subsection.monitors")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(.secondary)
+            Picker("interaction.spotlight.exclusion_mode", selection: spotlightExclusionModeBinding) {
+                Text("interaction.spotlight.exclusion_mode.single").tag(SpotlightExclusionMode.single)
+                Text("interaction.spotlight.exclusion_mode.per_monitor").tag(SpotlightExclusionMode.perMonitor)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!settingsVM.spotlight.enabled)
+            Text("interaction.spotlight.exclusion_mode.hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Divider().padding(.vertical, 2)
+
+            Text("interaction.spotlight.subsection.delay")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(.secondary)
+            Slider(
+                value: spotlightDelayBinding,
+                in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
+                step: 0.5
+            ) {
+                Text("interaction.spotlight.delay")
+            } minimumValueLabel: {
+                Text("interaction.spotlight.delay.min")
+            } maximumValueLabel: {
+                Text("interaction.spotlight.delay.max")
+            }
+            .disabled(!settingsVM.spotlight.enabled)
+
+            Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+
+            Divider().padding(.vertical, 2)
+
+            Text("interaction.spotlight.subsection.experimental")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(.secondary)
+            Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightDimBrowserChromeBinding)
+                .disabled(!settingsVM.spotlight.enabled)
+            Text("interaction.spotlight.dim_browser_chrome.hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text("interaction.spotlight.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var previewSection: some View {
@@ -231,7 +310,7 @@ struct InteractionTab: View {
             get: { settingsVM.spotlight.enabled },
             set: { v in
                 let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: v, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds))
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: v, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
             }
         )
     }
@@ -241,7 +320,7 @@ struct InteractionTab: View {
             get: { settingsVM.spotlight.scope },
             set: { v in
                 let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: v, idleDelaySeconds: c.idleDelaySeconds))
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: v, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
             }
         )
     }
@@ -251,7 +330,27 @@ struct InteractionTab: View {
             get: { settingsVM.spotlight.idleDelaySeconds },
             set: { v in
                 let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: v))
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: v, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
+            }
+        )
+    }
+
+    private var spotlightExclusionModeBinding: Binding<SpotlightExclusionMode> {
+        Binding(
+            get: { settingsVM.spotlight.exclusionMode },
+            set: { v in
+                let c = settingsVM.spotlight
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: v, dimBrowserChrome: c.dimBrowserChrome))
+            }
+        )
+    }
+
+    private var spotlightDimBrowserChromeBinding: Binding<Bool> {
+        Binding(
+            get: { settingsVM.spotlight.dimBrowserChrome },
+            set: { v in
+                let c = settingsVM.spotlight
+                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: v))
             }
         )
     }

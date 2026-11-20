@@ -37,6 +37,19 @@ final class SpotlightController {
     private var windowElement: AXUIElement?
     private var windowObserver: AXObserver?
 
+    /// For `.perMonitor` exclusion mode: the last app/window that was active
+    /// on each screen, keyed by `CGDirectDisplayID`. Updated every time the
+    /// focused window resolves to a screen (see `handleFocusedWindowChanged`)
+    /// — NOT cleared when focus moves to another screen, so a screen keeps
+    /// showing its own last-active window undimmed even while you're
+    /// actively working on a different one. Ignored entirely in `.single` mode.
+    private var perScreenTargets: [CGDirectDisplayID: PerScreenTarget] = [:]
+
+    private struct PerScreenTarget {
+        let pid: pid_t
+        let windowElement: AXUIElement?
+    }
+
     private var activationObserver: NSObjectProtocol?
     private var screenChangeObserver: NSObjectProtocol?
 
@@ -113,6 +126,7 @@ final class SpotlightController {
         overlays.removeAll()
         isShown = false
         frontmostPID = nil
+        perScreenTargets.removeAll()
     }
 
     private func rebuildOverlays() {
@@ -171,6 +185,7 @@ final class SpotlightController {
         else { return }
         let element = focused as! AXUIElement
         windowElement = element
+        recordPerScreenTarget(pid: pid, windowElement: element)
 
         var observer: AXObserver?
         let createErr = AXObserverCreate(pid, Self.observerCallback, &observer)
@@ -250,24 +265,91 @@ final class SpotlightController {
         // frontmost app has no visible windows) — showing a full-screen dim
         // with no hole at all would be actively unhelpful, so skip.
         guard !frames.isEmpty else { return }
+        let reDim = config.dimBrowserChrome ? currentBrowserChromeFrames() : []
         for overlay in overlays {
-            overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame)
+            overlay.updateHoles(excludedFrames: frames, reDimFrames: reDim, screenFrame: overlay.frame)
             overlay.show()
         }
         isShown = true
     }
 
     private func currentExclusionFrames() -> [CGRect] {
+        switch config.exclusionMode {
+        case .single:
+            return exclusionFrames(pid: frontmostPID, windowElement: windowElement, restrictTo: nil)
+        case .perMonitor:
+            // One exclusion target per screen, each computed from THAT
+            // screen's own last-recorded target rather than the global
+            // frontmost one — see `recordPerScreenTarget`. `restrictTo` keeps
+            // `.activeApp` scope from pulling in that same app's windows on
+            // OTHER screens too; otherwise an app with windows on two
+            // monitors would stay undimmed on both from a single target.
+            var frames: [CGRect] = []
+            for screen in NSScreen.screens {
+                guard let id = Self.displayID(for: screen), let target = perScreenTargets[id] else { continue }
+                frames.append(contentsOf: exclusionFrames(pid: target.pid, windowElement: target.windowElement, restrictTo: screen))
+            }
+            return frames
+        }
+    }
+
+    private func exclusionFrames(pid: pid_t?, windowElement: AXUIElement?, restrictTo screen: NSScreen?) -> [CGRect] {
         switch config.scope {
         case .activeWindow:
             guard let windowElement, let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return [] }
             return [DisplayCoordinates.axToNS(axFrame)]
         case .activeApp:
-            guard let pid = frontmostPID,
+            guard let pid,
                   let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
                   let windows = try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID)
             else { return [] }
-            return windows.map(\.frame)
+            guard let screen else { return windows.map(\.frame) }
+            return windows.map(\.frame).filter { screen.frame.intersects($0) }
         }
+    }
+
+    /// EXPERIMENTAL (see `BrowserChromeDetector`) — the sub-rects to re-darken
+    /// inside whatever's currently excluded, for browsers Scene recognizes.
+    /// Mirrors `currentExclusionFrames`'s single/perMonitor split so chrome
+    /// dimming covers the same target(s) the exclusion itself covers.
+    private func currentBrowserChromeFrames() -> [CGRect] {
+        switch config.exclusionMode {
+        case .single:
+            return browserChromeFrames(pid: frontmostPID, windowElement: windowElement)
+        case .perMonitor:
+            var frames: [CGRect] = []
+            for target in perScreenTargets.values {
+                frames.append(contentsOf: browserChromeFrames(pid: target.pid, windowElement: target.windowElement))
+            }
+            return frames
+        }
+    }
+
+    private func browserChromeFrames(pid: pid_t?, windowElement: AXUIElement?) -> [CGRect] {
+        guard let pid, let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier else { return [] }
+        switch config.scope {
+        case .activeWindow:
+            guard let windowElement else { return [] }
+            return BrowserChromeDetector.chromeRegions(windowElement: windowElement, bundleID: bundleID) ?? []
+        case .activeApp:
+            guard let windows = try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID) else { return [] }
+            return windows.flatMap { BrowserChromeDetector.chromeRegions(windowElement: $0.axElement, bundleID: bundleID) ?? [] }
+        }
+    }
+
+    /// Remembers which screen a just-focused window landed on, so
+    /// `.perMonitor` mode can later ask "what was last active on screen X"
+    /// independently of whatever's frontmost system-wide right now.
+    private func recordPerScreenTarget(pid: pid_t, windowElement: AXUIElement) {
+        guard let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return }
+        let nsFrame = DisplayCoordinates.axToNS(axFrame)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(nsFrame) }),
+              let id = Self.displayID(for: screen)
+        else { return }
+        perScreenTargets[id] = PerScreenTarget(pid: pid, windowElement: windowElement)
+    }
+
+    private static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
     }
 }

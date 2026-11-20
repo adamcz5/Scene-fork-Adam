@@ -116,6 +116,12 @@ struct MenuBarContentView: View {
 
             PanelDivider()
 
+            sectionHeader("menu.section.dim")
+            dimEnabledRow
+            dimExclusionModeRow
+
+            PanelDivider()
+
             Button(action: {
                 closePanel()
                 appDelegate.openSettings()
@@ -221,6 +227,59 @@ struct MenuBarContentView: View {
         }
         .buttonStyle(MenuRowButtonStyle())
         .disabled(coordinator.freeMode)
+    }
+
+    /// Quick on/off for Spotlight (dim) — mirrors `spotlightEnabledBinding`
+    /// in `InteractionTab`, so Settings and the menu stay in lockstep.
+    private var dimEnabledRow: some View {
+        Button(action: toggleDimEnabled) {
+            HStack(spacing: 6) {
+                checkmarkColumn(settingsVM.spotlight.enabled)
+                Text("menu.dim.enable")
+                Spacer()
+            }
+        }
+        .buttonStyle(MenuRowButtonStyle())
+    }
+
+    /// Cycles the EXCLUSION MODE axis only (single app anywhere vs. one app
+    /// per monitor) — independent of whether Dim is currently on, same as
+    /// `stickyModeRow` staying clickable regardless of Free Mode.
+    private var dimExclusionModeRow: some View {
+        Button(action: cycleDimExclusionMode) {
+            HStack(spacing: 6) {
+                Image(systemName: "rectangle.on.rectangle")
+                    .foregroundStyle(.secondary)
+                Text("menu.dim.exclusion_mode")
+                Spacer()
+                Text(dimExclusionModeValueLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(MenuRowButtonStyle())
+    }
+
+    private var dimExclusionModeValueLabel: String {
+        switch settingsVM.spotlight.exclusionMode {
+        case .single:     return String(localized: "interaction.spotlight.exclusion_mode.single")
+        case .perMonitor: return String(localized: "interaction.spotlight.exclusion_mode.per_monitor")
+        }
+    }
+
+    private func toggleDimEnabled() {
+        let c = settingsVM.spotlight
+        try? settingsVM.store.setSpotlight(
+            SpotlightConfig(enabled: !c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome)
+        )
+    }
+
+    private func cycleDimExclusionMode() {
+        let c = settingsVM.spotlight
+        let next: SpotlightExclusionMode = c.exclusionMode == .single ? .perMonitor : .single
+        try? settingsVM.store.setSpotlight(
+            SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: next, dimBrowserChrome: c.dimBrowserChrome)
+        )
     }
 
     private var nextStickyMode: StickyModeOption {

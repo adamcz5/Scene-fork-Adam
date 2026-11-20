@@ -41,22 +41,39 @@ final class UpdateInstaller: ObservableObject {
     @Published private(set) var isInstalling = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var lastError: String?
+    /// Fraction complete (0...1) for the download phase only, so the progress
+    /// window can show a real moving bar instead of just an indeterminate
+    /// spinner — the download is by far the longest-running phase. `nil`
+    /// before the download starts and once it's done (verify/install fall
+    /// back to the indeterminate spinner).
+    @Published private(set) var downloadProgress: Double?
 
     private let log = Logger(subsystem: "com.scene.app", category: "update-installer")
     private let expectedTeamID = "22K6G3HH9G"
+    /// Keeps the KVO observation on the download task's `Progress` alive for
+    /// the lifetime of one install attempt.
+    private var downloadProgressObservation: NSKeyValueObservation?
 
     /// Kicks off the full download → verify → install → quit flow. On
     /// success this function does not return — Scene quits before the helper
     /// finishes. On failure, `lastError` is populated.
+    ///
+    /// Shows a small always-on-top progress window for the duration — without
+    /// it, the only visible change was the menu/Settings UI going idle for
+    /// however long the download takes, which read as the app having hung.
     func install(dmgURL: URL, version: String) async {
         guard !isInstalling else { return }
         isInstalling = true
+        downloadProgress = nil
+        let progressWindow = UpdateProgressWindowController(updateInstaller: self)
+        progressWindow.show()
         defer { isInstalling = false }
 
         do {
             statusMessage = String(format: String(localized: "update.installer.downloading"), version)
             log.info("downloading \(dmgURL.absoluteString, privacy: .public)")
             let dmgPath = try await downloadDMG(from: dmgURL, version: version)
+            downloadProgress = nil
 
             statusMessage = String(localized: "update.installer.verifying")
             try verifyDMGSignature(dmgPath: dmgPath)
@@ -65,13 +82,16 @@ final class UpdateInstaller: ObservableObject {
             try launchHelperScript(dmgPath: dmgPath)
 
             // Helper waits for our PID — quit Scene now so the helper can
-            // proceed with the file replacement.
+            // proceed with the file replacement. The progress window closes
+            // along with the rest of the app.
             log.info("install handoff complete; quitting Scene to let helper run")
             NSApp.terminate(nil)
         } catch {
             log.error("install failed: \(String(describing: error), privacy: .public)")
             lastError = String(describing: error)
             statusMessage = nil
+            downloadProgress = nil
+            progressWindow.close()
 
             // Surface to the user via macOS notification — they triggered an
             // install and got nothing visible, so without this they'd assume
@@ -101,16 +121,42 @@ final class UpdateInstaller: ObservableObject {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 60
-        let (tempURL, response) = try await URLSession.shared.download(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw NSError(
-                domain: "UpdateInstaller", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Download failed (HTTP \(code))"]
-            )
+
+        // Delegate-based `downloadTask` (rather than the async `download(for:)`
+        // convenience) so we get a `Foundation.Progress` object to KVO-observe
+        // for `downloadProgress` — that's what drives the determinate bar in
+        // the progress window.
+        return try await withCheckedThrowingContinuation { continuation in
+            let task = URLSession.shared.downloadTask(with: request) { tempURL, response, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let tempURL,
+                      let http = response as? HTTPURLResponse,
+                      http.statusCode == 200 else {
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    continuation.resume(throwing: NSError(
+                        domain: "UpdateInstaller", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Download failed (HTTP \(code))"]
+                    ))
+                    return
+                }
+                do {
+                    try FileManager.default.moveItem(at: tempURL, to: dest)
+                    continuation.resume(returning: dest)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            downloadProgressObservation = task.progress.observe(\.fractionCompleted) { [weak self] progress, _ in
+                let fraction = progress.fractionCompleted
+                Task { @MainActor in
+                    self?.downloadProgress = fraction
+                }
+            }
+            task.resume()
         }
-        try FileManager.default.moveItem(at: tempURL, to: dest)
-        return dest
     }
 
     // MARK: - Signature verification
