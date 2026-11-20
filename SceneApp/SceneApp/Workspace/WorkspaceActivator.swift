@@ -154,13 +154,14 @@ final class WorkspaceActivator {
             for screen in NSScreen.screens {
                 let targetID = workspace.resolvedLayoutID(forDisplay: screen.localizedName)
                 guard layoutStore.layouts.contains(where: { $0.id == targetID }) else { continue }
-                // v1 simplification: the same slotAssignments list (indexed
-                // against `workspace.layoutID`) is applied to whichever layout
-                // ends up on each screen. Fine while a Workspace's per-display
-                // layouts share the same zone count/order as its primary
-                // layout; a mismatch just means an assignment's slotIndex
-                // silently misses (falls through to the sticky/fill pass).
-                let ok = await applyLayout(targetID, screen, workspace.slotAssignments)
+                // Each display uses its OWN zone→app assignments (indexed against
+                // ITS layout); a display with none recorded (no entry, or an
+                // entry saved before per-display assignments existed) falls
+                // back to the workspace-wide list — see
+                // `Workspace.resolvedSlotAssignments(forDisplay:)`.
+                let ok = await applyLayout(
+                    targetID, screen, workspace.resolvedSlotAssignments(forDisplay: screen.localizedName)
+                )
                 anyApplied = anyApplied || ok
             }
             if !anyApplied {

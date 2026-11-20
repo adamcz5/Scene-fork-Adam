@@ -102,6 +102,14 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         displayLayouts.first(where: { $0.displayName == name })?.layoutID ?? layoutID
     }
 
+    /// Returns the zone→app assignments to use for a given display name: that
+    /// display's own list when it has one recorded, otherwise the workspace-wide
+    /// `slotAssignments` (displays with no entry, and entries saved before
+    /// per-display assignments existed).
+    public func resolvedSlotAssignments(forDisplay name: String) -> [WorkspaceSlotAssignment] {
+        displayLayouts.first(where: { $0.displayName == name })?.slotAssignments ?? slotAssignments
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id
         case name

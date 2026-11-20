@@ -9,7 +9,7 @@ import Foundation
 /// count/order isn't edited afterward. Not a UUID-per-slot design because
 /// `Slot`/`LayoutNode` have no stable identity today; index-based matches how
 /// the engine already tracks placements elsewhere (see `Plan.swift`).
-public struct WorkspaceSlotAssignment: Codable, Equatable, Sendable, Identifiable {
+public struct WorkspaceSlotAssignment: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var slotIndex: Int
     /// e.g. "com.google.Chrome".

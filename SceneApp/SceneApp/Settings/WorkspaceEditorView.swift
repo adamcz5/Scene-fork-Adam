@@ -1,7 +1,8 @@
 import SwiftUI
 import SceneCore
 
-/// Workspace editor — basics (name / layout / hotkey), zone assignment,
+/// Workspace editor — basics (name / hotkey), displays & layouts (layout and
+/// zone→app assignment per display),
 /// focus (Shortcut names), and collapsed launch/quit lists. Saved to the store via
 /// `WorkspaceStoreViewModel.update(_:)` which enforces strict update semantics
 /// (throws on missing ID) and cross-store hotkey conflict detection.
@@ -44,10 +45,6 @@ struct WorkspaceEditorView: View {
         Form {
             Section("workspace.editor.section.basics") {
                 TextField("workspace.editor.name", text: $draft.name)
-                LayoutPickerView(
-                    selectedID: $draft.layoutID,
-                    layoutStore: layoutStore
-                )
                 HotkeyField(chord: $draft.hotkey)
                 Toggle("workspace.editor.quick_picker.show", isOn: $draft.showInQuickPicker)
                 Text("workspace.editor.quick_picker.hint")
@@ -55,17 +52,7 @@ struct WorkspaceEditorView: View {
                     .foregroundStyle(.secondary)
             }
             Section("workspace.editor.section.displays") {
-                DisplayLayoutsEditor(
-                    displayLayouts: $draft.displayLayouts,
-                    fallbackLayoutID: draft.layoutID,
-                    layoutStore: layoutStore
-                )
-            }
-            Section("workspace.editor.section.apps") {
-                SlotAssignmentEditor(
-                    slotAssignments: $draft.slotAssignments,
-                    layout: layoutStore.layouts.first(where: { $0.id == draft.layoutID })
-                )
+                WorkspaceDisplaysEditor(draft: $draft, layoutStore: layoutStore)
             }
             Section("workspace.editor.section.persistent") {
                 AppPickerView(bundleIDs: $draft.pinnedApps, label: "workspace.editor.pinned_apps")

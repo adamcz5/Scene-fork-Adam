@@ -167,4 +167,45 @@ final class DisplayLayoutAssignmentTests: XCTestCase {
         modified2.displayLayouts[0].layoutID = layoutB
         XCTAssertNotEqual(modified, modified2)
     }
+
+    // MARK: - Per-display slot assignments
+
+    func testSlotAssignmentsDefaultToNilAndRoundTrip() throws {
+        let plain = DisplayLayoutAssignment(displayName: "Monitor", layoutID: UUID())
+        XCTAssertNil(plain.slotAssignments)
+
+        let withZones = DisplayLayoutAssignment(
+            displayName: "Monitor",
+            layoutID: UUID(),
+            slotAssignments: [WorkspaceSlotAssignment(slotIndex: 1, bundleID: "com.google.Chrome", titleContains: "Work")]
+        )
+        let data = try JSONEncoder().encode(withZones)
+        let decoded = try JSONDecoder().decode(DisplayLayoutAssignment.self, from: data)
+        XCTAssertEqual(decoded, withZones)
+    }
+
+    func testLegacyJSONWithoutSlotAssignmentsDecodesToNil() throws {
+        let json = #"{"displayName":"Monitor","layoutID":"11111111-0001-0000-0000-000000000001"}"#.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(DisplayLayoutAssignment.self, from: json)
+        XCTAssertNil(decoded.slotAssignments)
+    }
+
+    func testResolvedSlotAssignmentsPrefersDisplayListAndFallsBackToWorkspace() {
+        let rootZone = WorkspaceSlotAssignment(slotIndex: 0, bundleID: "com.apple.Safari")
+        let externalZone = WorkspaceSlotAssignment(slotIndex: 1, bundleID: "com.tinyspeck.slackmacgap")
+        let workspace = Workspace(
+            name: "Test",
+            layoutID: UUID(),
+            displayLayouts: [
+                DisplayLayoutAssignment(displayName: "External", layoutID: UUID(), slotAssignments: [externalZone]),
+                DisplayLayoutAssignment(displayName: "Legacy", layoutID: UUID()),
+                DisplayLayoutAssignment(displayName: "Empty", layoutID: UUID(), slotAssignments: []),
+            ],
+            slotAssignments: [rootZone]
+        )
+        XCTAssertEqual(workspace.resolvedSlotAssignments(forDisplay: "External"), [externalZone])
+        XCTAssertEqual(workspace.resolvedSlotAssignments(forDisplay: "Legacy"), [rootZone])
+        XCTAssertEqual(workspace.resolvedSlotAssignments(forDisplay: "Unlisted"), [rootZone])
+        XCTAssertEqual(workspace.resolvedSlotAssignments(forDisplay: "Empty"), [])
+    }
 }

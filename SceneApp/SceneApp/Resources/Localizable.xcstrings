@@ -3985,19 +3985,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Per-Display Layouts"
+            "value": "Displays & Layouts"
           }
         },
         "zh-HK": {
           "stringUnit": {
             "state": "translated",
-            "value": "各顯示器佈局"
+            "value": "顯示器與佈局"
           }
         },
         "zh-TW": {
           "stringUnit": {
             "state": "translated",
-            "value": "各顯示器版面"
+            "value": "顯示器與版面"
           }
         }
       }
@@ -5467,6 +5467,42 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Hotkey" } }
+      }
+    },
+    "workspace.editor.displays.single_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Applied to the screen your mouse is on. Pick a layout, then click a zone to choose which app goes there." } }
+      }
+    },
+    "workspace.editor.displays.split": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Use a different layout per display" } }
+      }
+    },
+    "workspace.editor.displays.split.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Give each connected display its own layout and its own apps." } }
+      }
+    },
+    "workspace.editor.displays.merge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Use one layout for every display" } }
+      }
+    },
+    "workspace.editor.displays.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add display" } }
+      }
+    },
+    "workspace.editor.displays.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remove this display" } }
       }
     },
     "interaction.spotlight.section.hint": {

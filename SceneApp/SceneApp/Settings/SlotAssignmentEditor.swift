@@ -65,6 +65,9 @@ struct SlotAssignmentEditor: View {
             height: slot.rect.height * canvasSize.height
         ).insetBy(dx: 2, dy: 2)
         let existing = assignment(for: index)
+        // The zone whose assignment sheet is open is the one being edited —
+        // ring it so it's obvious which zone the sheet belongs to.
+        let isEditing = editingSlotIndex == index
         Button(action: { editingSlotIndex = index }) {
             VStack(spacing: 4) {
                 if let existing, let icon = appIcon(for: existing.bundleID) {
@@ -88,9 +91,20 @@ struct SlotAssignmentEditor: View {
             .frame(width: max(rect.width, 1), height: max(rect.height, 1))
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.accentColor.opacity(existing == nil ? 0.12 : 0.25))
+                    .fill(Color.accentColor.opacity(isEditing ? 0.4 : (existing == nil ? 0.12 : 0.25)))
             )
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor.opacity(0.4)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.accentColor.opacity(isEditing ? 1 : 0.4), lineWidth: isEditing ? 3 : 1)
+            )
+            .overlay(alignment: .topLeading) {
+                Text("\(index + 1)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(isEditing ? Color.white : Color.accentColor)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(isEditing ? Color.accentColor : Color.accentColor.opacity(0.18)))
+                    .padding(3)
+            }
         }
         .buttonStyle(.plain)
         .position(x: rect.midX, y: rect.midY)
