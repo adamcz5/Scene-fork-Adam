@@ -55,7 +55,7 @@ struct SettingsRoot: View {
                     )
                 case .layouts:     LayoutsTab()
                 case .hotkeys:     HotkeysTab()
-                case .interaction: InteractionTab()
+                case .interaction: InteractionTab(calendarPermissionRequester: calendarPermissionRequester)
                 case .about:       AboutTab(reopenWelcome: reopenWelcome, exportDiagnostics: exportDiagnostics)
                 }
             }

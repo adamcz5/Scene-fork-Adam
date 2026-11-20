@@ -239,7 +239,7 @@ extension SettingsStoreTests {
         let store = try SettingsStore(fileURL: fileURL)
         var fired = 0
         let token = store.onChange { fired += 1 }
-        let config = SpotlightConfig(enabled: true, scope: .activeApp, idleDelaySeconds: 4)
+        let config = SpotlightConfig(enabled: true, exclusionMode: .perMonitor, idleDelaySeconds: 4)
         try store.setSpotlight(config)
         XCTAssertEqual(store.spotlight, config)
         XCTAssertEqual(fired, 1)

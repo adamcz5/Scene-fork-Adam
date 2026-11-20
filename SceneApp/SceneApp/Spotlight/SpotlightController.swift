@@ -5,7 +5,7 @@ import os
 import SceneCore
 
 /// Drives "Spotlight" — a dim+blur overlay (one `SpotlightOverlayWindow` per
-/// screen) that darkens everything except the active window or app. See
+/// screen) that darkens everything except the active window. See
 /// `SpotlightConfig`'s doc comment for why this is NOT named `FocusMode`
 /// (that name is already `Workspace.focusMode`'s macOS-Focus-Shortcut
 /// integration, an unrelated feature).
@@ -15,9 +15,11 @@ import SceneCore
 /// - Any interaction (app activated, focused window changed within an app,
 ///   focused window moved/resized) → `interactionOccurred()`: cancel the
 ///   pending show-timer, fade the overlay out (if showing), start a fresh
-///   `idleDelaySeconds` timer.
-/// - Timer fires → compute the current exclusion rect(s) for `config.scope`
-///   and fade the overlay in with holes cut at those rects.
+///   `idleDelaySeconds` timer. Exception: focusing a window that is already
+///   inside a shown hole (e.g. hopping between per-monitor apps that are each
+///   visible) is a no-op — see `handleFocusedWindowChanged`.
+/// - Timer fires → compute the current exclusion rect(s) for
+///   `config.exclusionMode` and fade the overlay in with holes cut there.
 ///
 /// Independent of `Coordinator`'s own AX observers (drag-swap/seam-resize) —
 /// those track PLACED windows from the last applied layout; this tracks
@@ -29,6 +31,10 @@ final class SpotlightController {
 
     private var overlays: [SpotlightOverlayWindow] = []
     private var isShown = false
+    /// The exclusion rects punched into the overlay while it's showing (NS
+    /// coordinates). Used to tell whether a newly-focused window is ALREADY
+    /// undimmed, in which case focusing it must not dissolve the dim.
+    private var shownExclusionFrames: [CGRect] = []
     private var showTimer: Timer?
 
     private var frontmostPID: pid_t?
@@ -85,12 +91,13 @@ final class SpotlightController {
         let shouldRun = newConfig.enabled && permissionGranted
         let wasRunning = config.enabled && permissionGranted
         config = newConfig
+        for overlay in overlays { overlay.apply(config: newConfig) }
         if shouldRun, !wasRunning {
             start()
         } else if !shouldRun, wasRunning {
             stop()
         } else if shouldRun {
-            // Already running, something about scope/delay changed — treat
+            // Already running, something about the config changed — treat
             // as an interaction so the new config takes effect on the next
             // idle period rather than mid-display with stale settings.
             interactionOccurred()
@@ -125,6 +132,7 @@ final class SpotlightController {
         for overlay in overlays { overlay.hide(immediate: true) }
         overlays.removeAll()
         isShown = false
+        shownExclusionFrames = []
         frontmostPID = nil
         perScreenTargets.removeAll()
     }
@@ -135,22 +143,32 @@ final class SpotlightController {
             overlays = []
             return
         }
-        overlays = NSScreen.screens.map { SpotlightOverlayWindow(screen: $0) }
+        overlays = NSScreen.screens.map { screen in
+            let overlay = SpotlightOverlayWindow(screen: screen)
+            overlay.apply(config: config)
+            return overlay
+        }
         isShown = false
+        shownExclusionFrames = []
     }
 
     // MARK: - AX tracking
 
     private func handleFrontmostAppChanged(pid: pid_t?) {
-        interactionOccurred()
         teardownAppObserver()
         teardownWindowObserver()
         frontmostPID = pid
-        guard config.enabled, permissionGranted, let pid else { return }
+        guard config.enabled, permissionGranted, let pid else {
+            interactionOccurred()
+            return
+        }
 
         // Scene itself (menu-bar-only) becoming "frontmost" — e.g. opening
         // Settings — should never trigger dimming around a Scene window.
-        if pid == ProcessInfo.processInfo.processIdentifier { return }
+        if pid == ProcessInfo.processInfo.processIdentifier {
+            interactionOccurred()
+            return
+        }
 
         let element = AXUIElementCreateApplication(pid)
         appElement = element
@@ -174,35 +192,74 @@ final class SpotlightController {
         handleFocusedWindowChanged()
     }
 
+    /// Resolves the newly focused window and decides whether this counts as an
+    /// "interaction" (dissolve the dim, restart the idle timer) or not.
+    ///
+    /// Focusing a window that is ALREADY undimmed — e.g. hopping between the
+    /// per-monitor apps that are each visible — changes nothing the user can
+    /// see, so it must not flicker the overlay off and back on. Only moving
+    /// focus to something that is currently dimmed (or anything unresolvable)
+    /// takes the normal dissolve + re-arm path.
     private func handleFocusedWindowChanged() {
-        interactionOccurred()
         teardownWindowObserver()
-        guard config.enabled, permissionGranted, let appElement, let pid = frontmostPID else { return }
+        guard config.enabled, permissionGranted, let appElement, let pid = frontmostPID else {
+            interactionOccurred()
+            return
+        }
 
         var focusedRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success,
               let focused = focusedRef
-        else { return }
+        else {
+            interactionOccurred()
+            return
+        }
         let element = focused as! AXUIElement
         windowElement = element
         recordPerScreenTarget(pid: pid, windowElement: element)
 
         var observer: AXObserver?
         let createErr = AXObserverCreate(pid, Self.observerCallback, &observer)
-        guard createErr == .success, let observer else {
+        if createErr == .success, let observer {
+            let refcon = Unmanaged.passUnretained(self).toOpaque()
+            var anySucceeded = false
+            for notif in [kAXMovedNotification, kAXResizedNotification] {
+                if AXObserverAddNotification(observer, element, notif as CFString, refcon) == .success {
+                    anySucceeded = true
+                }
+            }
+            if anySucceeded {
+                CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+                windowObserver = observer
+            }
+        } else {
             log.error("AXObserverCreate(window) failed pid=\(pid, privacy: .public) err=\(createErr.rawValue, privacy: .public)")
+        }
+
+        if isShown, isAlreadyUndimmed(windowElement: element) {
             return
         }
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        var anySucceeded = false
-        for notif in [kAXMovedNotification, kAXResizedNotification] {
-            if AXObserverAddNotification(observer, element, notif as CFString, refcon) == .success {
-                anySucceeded = true
+        interactionOccurred()
+    }
+
+    /// Whether `windowElement` currently sits inside a hole of the SHOWN
+    /// overlay. `.single` mode has one hole around one window, so it needs
+    /// that same window (frames equal); `.perMonitor` keeps one hole per
+    /// screen, so any window within one of them is already visible.
+    private func isAlreadyUndimmed(windowElement: AXUIElement) -> Bool {
+        guard let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return false }
+        let frame = DisplayCoordinates.axToNS(axFrame)
+        let tolerance: CGFloat = 2
+        switch config.exclusionMode {
+        case .single:
+            return shownExclusionFrames.contains { shown in
+                abs(shown.minX - frame.minX) <= tolerance && abs(shown.minY - frame.minY) <= tolerance &&
+                abs(shown.width - frame.width) <= tolerance && abs(shown.height - frame.height) <= tolerance
             }
-        }
-        if anySucceeded {
-            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
-            windowObserver = observer
+        case .perMonitor:
+            return shownExclusionFrames.contains { shown in
+                shown.insetBy(dx: -tolerance, dy: -tolerance).contains(frame)
+            }
         }
     }
 
@@ -250,6 +307,7 @@ final class SpotlightController {
         if isShown {
             for overlay in overlays { overlay.hide() }
             isShown = false
+            shownExclusionFrames = []
         }
         guard config.enabled, permissionGranted else { return }
         showTimer = Timer.scheduledTimer(withTimeInterval: config.idleDelaySeconds, repeats: false) { [weak self] _ in
@@ -271,41 +329,31 @@ final class SpotlightController {
             overlay.show()
         }
         isShown = true
+        shownExclusionFrames = frames
     }
 
     private func currentExclusionFrames() -> [CGRect] {
         switch config.exclusionMode {
         case .single:
-            return exclusionFrames(pid: frontmostPID, windowElement: windowElement, restrictTo: nil)
+            return exclusionFrame(of: windowElement).map { [$0] } ?? []
         case .perMonitor:
             // One exclusion target per screen, each computed from THAT
             // screen's own last-recorded target rather than the global
-            // frontmost one — see `recordPerScreenTarget`. `restrictTo` keeps
-            // `.activeApp` scope from pulling in that same app's windows on
-            // OTHER screens too; otherwise an app with windows on two
-            // monitors would stay undimmed on both from a single target.
+            // frontmost one — see `recordPerScreenTarget`.
             var frames: [CGRect] = []
             for screen in NSScreen.screens {
-                guard let id = Self.displayID(for: screen), let target = perScreenTargets[id] else { continue }
-                frames.append(contentsOf: exclusionFrames(pid: target.pid, windowElement: target.windowElement, restrictTo: screen))
+                guard let id = Self.displayID(for: screen), let target = perScreenTargets[id],
+                      let frame = exclusionFrame(of: target.windowElement)
+                else { continue }
+                frames.append(frame)
             }
             return frames
         }
     }
 
-    private func exclusionFrames(pid: pid_t?, windowElement: AXUIElement?, restrictTo screen: NSScreen?) -> [CGRect] {
-        switch config.scope {
-        case .activeWindow:
-            guard let windowElement, let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return [] }
-            return [DisplayCoordinates.axToNS(axFrame)]
-        case .activeApp:
-            guard let pid,
-                  let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
-                  let windows = try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID)
-            else { return [] }
-            guard let screen else { return windows.map(\.frame) }
-            return windows.map(\.frame).filter { screen.frame.intersects($0) }
-        }
+    private func exclusionFrame(of windowElement: AXUIElement?) -> CGRect? {
+        guard let windowElement, let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return nil }
+        return DisplayCoordinates.axToNS(axFrame)
     }
 
     /// EXPERIMENTAL (see `BrowserChromeDetector`) — the sub-rects to re-darken
@@ -326,15 +374,10 @@ final class SpotlightController {
     }
 
     private func browserChromeFrames(pid: pid_t?, windowElement: AXUIElement?) -> [CGRect] {
-        guard let pid, let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier else { return [] }
-        switch config.scope {
-        case .activeWindow:
-            guard let windowElement else { return [] }
-            return BrowserChromeDetector.chromeRegions(windowElement: windowElement, bundleID: bundleID) ?? []
-        case .activeApp:
-            guard let windows = try? AXWindowEnumerator.listVisibleWindows(forBundleID: bundleID) else { return [] }
-            return windows.flatMap { BrowserChromeDetector.chromeRegions(windowElement: $0.axElement, bundleID: bundleID) ?? [] }
-        }
+        guard let pid, let windowElement,
+              let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+        else { return [] }
+        return BrowserChromeDetector.chromeRegions(windowElement: windowElement, bundleID: bundleID) ?? []
     }
 
     /// Remembers which screen a just-focused window landed on, so

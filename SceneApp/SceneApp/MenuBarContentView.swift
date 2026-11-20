@@ -27,6 +27,10 @@ struct MenuBarContentView: View {
     /// that is the point of the window-style panel.
     @State private var panelWindow: NSWindow?
 
+    /// Layouts are collapsed by default — the list is long and workspaces are
+    /// the primary way to apply things from this panel.
+    @State private var layoutsExpanded = false
+
     var body: some View {
         Group {
             if coordinator.permissionGranted {
@@ -67,6 +71,10 @@ struct MenuBarContentView: View {
                 PanelDivider()
             }
 
+            dimTilesRow
+
+            PanelDivider()
+
             sectionHeader("menu.section.workspaces")
             if workspaceStore.workspaces.isEmpty {
                 Text("menu.workspaces.empty")
@@ -82,8 +90,11 @@ struct MenuBarContentView: View {
 
             PanelDivider()
 
-            ForEach(layoutStore.layouts) { layout in
-                layoutRow(layout)
+            layoutsDisclosureRow
+            if layoutsExpanded {
+                ForEach(layoutStore.layouts) { layout in
+                    layoutRow(layout)
+                }
             }
 
             PanelDivider()
@@ -99,8 +110,6 @@ struct MenuBarContentView: View {
             .disabled(coordinator.freeMode || coordinator.activeLayoutID == nil)
             .help("menu.reset_layout.help")
 
-            PanelDivider()
-
             Button(action: { coordinator.freeMode.toggle() }) {
                 HStack(spacing: 6) {
                     checkmarkColumn(coordinator.freeMode)
@@ -110,15 +119,7 @@ struct MenuBarContentView: View {
             }
             .buttonStyle(MenuRowButtonStyle())
 
-            PanelDivider()
-
             stickyModeRow
-
-            PanelDivider()
-
-            sectionHeader("menu.section.dim")
-            dimEnabledRow
-            dimExclusionModeRow
 
             PanelDivider()
 
@@ -229,31 +230,49 @@ struct MenuBarContentView: View {
         .disabled(coordinator.freeMode)
     }
 
-    /// Quick on/off for Spotlight (dim) — mirrors `spotlightEnabledBinding`
-    /// in `InteractionTab`, so Settings and the menu stay in lockstep.
-    private var dimEnabledRow: some View {
-        Button(action: toggleDimEnabled) {
-            HStack(spacing: 6) {
-                checkmarkColumn(settingsVM.spotlight.enabled)
-                Text("menu.dim.enable")
-                Spacer()
-            }
+    /// Two side-by-side on/off tiles for Spotlight (dim): "Dim" itself, and
+    /// "Per monitor" (on = one app stays visible per monitor, off = one app
+    /// globally). Per-monitor stays clickable while Dim is off so the choice
+    /// is already made when Dim is turned back on.
+    private var dimTilesRow: some View {
+        HStack(spacing: 6) {
+            dimTile("menu.dim.enable", systemImage: "moon.fill", isOn: settingsVM.spotlight.enabled, action: toggleDimEnabled)
+            dimTile("menu.dim.per_monitor", systemImage: "rectangle.on.rectangle", isOn: settingsVM.spotlight.exclusionMode == .perMonitor, action: toggleDimPerMonitor)
         }
-        .buttonStyle(MenuRowButtonStyle())
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
     }
 
-    /// Toggles the EXCLUSION MODE axis only (single app anywhere vs. one app
-    /// per monitor) — independent of whether Dim is currently on, same as
-    /// `stickyModeRow` staying clickable regardless of Free Mode. A plain
-    /// checkmark toggle, same as `workspaceRow`/`layoutRow`/Free Mode above —
-    /// a PREVIOUS version paired a static (non-functional) decorative icon
-    /// with separate cycling trailing text, which read as three different
-    /// controls for what is really one on/off switch. Checked = per-monitor.
-    private var dimExclusionModeRow: some View {
-        Button(action: toggleDimExclusionMode) {
+    private func dimTile(_ title: LocalizedStringKey, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                Text(title).lineLimit(1)
+            }
+            .font(.callout)
+            .fontWeight(isOn ? .semibold : .regular)
+            .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isOn ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.06))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var layoutsDisclosureRow: some View {
+        Button(action: { withAnimation(.easeInOut(duration: 0.15)) { layoutsExpanded.toggle() } }) {
             HStack(spacing: 6) {
-                checkmarkColumn(settingsVM.spotlight.exclusionMode == .perMonitor)
-                Text("menu.dim.exclusion_mode")
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .rotationEffect(.degrees(layoutsExpanded ? 90 : 0))
+                    .frame(width: 14)
+                Text("menu.section.layouts")
+                Text("(\(layoutStore.layouts.count))")
+                    .foregroundStyle(.secondary)
                 Spacer()
             }
         }
@@ -261,18 +280,15 @@ struct MenuBarContentView: View {
     }
 
     private func toggleDimEnabled() {
-        let c = settingsVM.spotlight
-        try? settingsVM.store.setSpotlight(
-            SpotlightConfig(enabled: !c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome)
-        )
+        var config = settingsVM.spotlight
+        config.enabled.toggle()
+        try? settingsVM.store.setSpotlight(config)
     }
 
-    private func toggleDimExclusionMode() {
-        let c = settingsVM.spotlight
-        let next: SpotlightExclusionMode = c.exclusionMode == .single ? .perMonitor : .single
-        try? settingsVM.store.setSpotlight(
-            SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: next, dimBrowserChrome: c.dimBrowserChrome)
-        )
+    private func toggleDimPerMonitor() {
+        var config = settingsVM.spotlight
+        config.exclusionMode = config.exclusionMode == .single ? .perMonitor : .single
+        try? settingsVM.store.setSpotlight(config)
     }
 
     private var nextStickyMode: StickyModeOption {

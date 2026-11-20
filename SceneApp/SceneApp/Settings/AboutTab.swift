@@ -24,6 +24,12 @@ struct AboutTab: View {
     }
 
     var body: some View {
+        ScrollView {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 12) {
             Text("about.app_name")
                 .font(.largeTitle)
@@ -62,6 +68,10 @@ struct AboutTab: View {
             Divider().padding(.vertical, 8)
 
             updatesSection
+
+            Divider().padding(.vertical, 8)
+
+            tipsSection
 
             Divider().padding(.vertical, 8)
 
@@ -118,6 +128,36 @@ struct AboutTab: View {
             Button(String(localized: "about.diagnostics.confirm.disable.cancel"), role: .cancel) {}
         } message: {
             Text("about.diagnostics.confirm.disable.body")
+        }
+    }
+
+    // MARK: - Tips
+
+    /// Short how-to notes for behavior that isn't obvious from the UI itself —
+    /// the central place the window-title matching feature is documented.
+    private var tipsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("about.tips.title")
+                .font(.headline)
+            tip("about.tips.title_matching.title", "about.tips.title_matching.body")
+            tip("about.tips.overlap.title", "about.tips.overlap.body")
+            tip("about.tips.dim.title", "about.tips.dim.body")
+            tip("about.tips.displays.title", "about.tips.displays.body")
+            tip("about.tips.free_mode.title", "about.tips.free_mode.body")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: 420)
+    }
+
+    private func tip(_ title: LocalizedStringKey, _ body: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.callout)
+                .bold()
+            Text(body)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

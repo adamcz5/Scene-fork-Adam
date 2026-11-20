@@ -1,8 +1,8 @@
 import SwiftUI
 import SceneCore
 
-/// Workspace editor — basics (name / layout / hotkey), apps (launch / quit),
-/// focus (Shortcut names), and triggers. Saved to the store via
+/// Workspace editor — basics (name / layout / hotkey), zone assignment,
+/// focus (Shortcut names), and collapsed launch/quit lists. Saved to the store via
 /// `WorkspaceStoreViewModel.update(_:)` which enforces strict update semantics
 /// (throws on missing ID) and cross-store hotkey conflict detection.
 ///
@@ -62,8 +62,6 @@ struct WorkspaceEditorView: View {
                 )
             }
             Section("workspace.editor.section.apps") {
-                AppPickerView(bundleIDs: $draft.appsToLaunch, label: "workspace.editor.apps_to_launch")
-                AppPickerView(bundleIDs: $draft.appsToQuit,   label: "workspace.editor.apps_to_quit")
                 SlotAssignmentEditor(
                     slotAssignments: $draft.slotAssignments,
                     layout: layoutStore.layouts.first(where: { $0.id == draft.layoutID })
@@ -118,11 +116,14 @@ struct WorkspaceEditorView: View {
                 )
                 Text("workspace.editor.focus.hint").font(.caption).foregroundStyle(.secondary)
             }
-            Section("workspace.editor.section.triggers") {
-                WorkspaceTriggerEditor(
-                    triggers: $draft.triggers,
-                    calendarPermissionRequester: calendarPermissionRequester
-                )
+            // Launch/quit lists are workspace-wide (not per display) and rarely
+            // touched, so they sit collapsed at the bottom. Automatic triggers
+            // are edited from Settings → Interaction → Workspace Triggers.
+            Section {
+                DisclosureGroup("workspace.editor.section.launch_quit") {
+                    AppPickerView(bundleIDs: $draft.appsToLaunch, label: "workspace.editor.apps_to_launch")
+                    AppPickerView(bundleIDs: $draft.appsToQuit,   label: "workspace.editor.apps_to_quit")
+                }
             }
             if let err = saveError {
                 Text(err).foregroundStyle(.red).font(.caption)
@@ -225,40 +226,6 @@ struct WorkspaceEditorView: View {
             return "workspace.editor.enforcement.hide_when_inactive.hint"
         case .quitWhenInactive:
             return "workspace.editor.enforcement.quit_when_inactive.hint"
-        }
-    }
-}
-
-/// Compact chord-capture field used inside the Workspace editor. Wraps the
-/// existing V0.2 `HotkeyCaptureView` (which uses a callback-style NSView) and
-/// adapts it to a `@Binding var chord: HotkeyBinding?` surface.
-private struct HotkeyField: View {
-    @Binding var chord: HotkeyBinding?
-    @State private var recording: Bool = false
-
-    var body: some View {
-        HStack {
-            Text("workspace.editor.hotkey").frame(width: 120, alignment: .leading)
-            if recording {
-                HotkeyCaptureView { binding in
-                    chord = binding
-                    recording = false
-                }
-                .frame(height: 24)
-            } else {
-                Text(chord?.displayString ?? String(localized: "workspace.editor.hotkey.none"))
-                    .frame(minWidth: 80, alignment: .leading)
-                    .foregroundStyle(chord == nil ? .secondary : .primary)
-            }
-            Spacer()
-            Button(recording ? "workspace.editor.hotkey.cancel" : "workspace.editor.hotkey.record") {
-                recording.toggle()
-            }
-            Button("workspace.editor.hotkey.clear") {
-                chord = nil
-                recording = false
-            }
-            .disabled(chord == nil)
         }
     }
 }

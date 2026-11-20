@@ -502,19 +502,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Animation"
+            "value": "Window Movement"
           }
         },
         "zh-HK": {
           "stringUnit": {
             "state": "translated",
-            "value": "動畫"
+            "value": "視窗移動動畫"
           }
         },
         "zh-TW": {
           "stringUnit": {
             "state": "translated",
-            "value": "動畫"
+            "value": "視窗移動動畫"
           }
         }
       }
@@ -522,7 +522,7 @@
     "interaction.animation.section.hint": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Governs how windows glide into place when a layout or workspace is applied." } }
+        "en": { "stringUnit": { "state": "translated", "value": "How windows glide into place when a layout or workspace is applied — tiling, snapping and drag-to-swap." } }
       }
     },
     "interaction.drag_swap.enable": {
@@ -2159,19 +2159,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Try this first: in System Settings → Privacy & Security → Accessibility, remove Scene with the “–” button, then click “+” and add it back. Just toggling the switch off and on does NOT refresh macOS's record of the app after an update."
+            "value": "Already used Scene before, or just updated it? In System Settings → Privacy & Security → Accessibility, remove Scene with “–”, then click “+” and add it back. Just switching the toggle off and on does NOT make macOS recognize the updated app."
           }
         },
         "zh-HK": {
           "stringUnit": {
             "state": "translated",
-            "value": "先試吓呢個：喺系統設定 → 私隱與安全性 → 輔助使用入面，用「–」刪除 Scene，再撳「+」加返轉去。淨係撥動個掣嘅開關，更新之後 macOS 唔會refresh番個記錄。"
+            "value": "之前用過 Scene，或者啱啱更新咗？喺系統設定 → 私隱與安全性 → 輔助使用入面，用「–」刪除 Scene，再撳「+」加返轉去。淨係撥動個開關，macOS 唔會認得更新後嘅 app。"
           }
         },
         "zh-TW": {
           "stringUnit": {
             "state": "translated",
-            "value": "先試試這個：在系統設定 → 隱私權與安全性 → 輔助使用中，用「–」移除 Scene，再按「+」重新加入。更新後僅切換開關並不會讓 macOS 重新辨識該應用程式。"
+            "value": "之前用過 Scene，或剛剛更新過？在系統設定 → 隱私權與安全性 → 輔助使用中，用「–」移除 Scene，再按「+」重新加入。僅切換開關並不會讓 macOS 認得更新後的 App。"
           }
         }
       }
@@ -5124,7 +5124,7 @@
     "menu.dim.enable": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Dim everything else" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Dim" } }
       }
     },
     "menu.dim.exclusion_mode": {
@@ -5199,6 +5199,222 @@
         "en": { "stringUnit": { "state": "translated", "value": "Spotlight (Dim)" } }
       }
     },
+    "interaction.spotlight.per_monitor": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "One app per monitor" } }
+      }
+    },
+    "interaction.spotlight.per_monitor.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "On: each display keeps its own last-active window visible at the same time (e.g. Slack on monitor 1 while you work in Chrome on monitor 2). Off: only one window is visible across all displays." } }
+      }
+    },
+    "interaction.spotlight.subsection.look": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "LOOK" } }
+      }
+    },
+    "interaction.spotlight.darkness": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Darkness" } }
+      }
+    },
+    "interaction.spotlight.darkness.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Light" } }
+      }
+    },
+    "interaction.spotlight.darkness.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dark" } }
+      }
+    },
+    "interaction.spotlight.blur": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Blur" } }
+      }
+    },
+    "interaction.spotlight.blur.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Off" } }
+      }
+    },
+    "interaction.spotlight.blur.light": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Light" } }
+      }
+    },
+    "interaction.spotlight.blur.heavy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Heavy" } }
+      }
+    },
+    "interaction.spotlight.speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fade speed" } }
+      }
+    },
+    "interaction.spotlight.speed.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Slow" } }
+      }
+    },
+    "interaction.spotlight.speed.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fast" } }
+      }
+    },
+    "interaction.spotlight.delay.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "How long you must stay on a window before the dim fades in." } }
+      }
+    },
+    "interaction.spotlight.subsection.hotkey": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "SHORTCUT" } }
+      }
+    },
+    "interaction.spotlight.hotkey": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Toggle dim" } }
+      }
+    },
+    "interaction.spotlight.hotkey.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Press it to turn dimming off; press it again to bring it back with the same settings." } }
+      }
+    },
+    "interaction.triggers.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workspace Triggers (Advanced)" } }
+      }
+    },
+    "interaction.triggers.section.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Activate a workspace automatically — when a monitor connects or disconnects, at a set time, or when a calendar event starts." } }
+      }
+    },
+    "interaction.triggers.expand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit triggers" } }
+      }
+    },
+    "interaction.triggers.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create a workspace first, then add triggers to it here." } }
+      }
+    },
+    "interaction.triggers.workspace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workspace" } }
+      }
+    },
+    "workspace.editor.section.launch_quit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apps to launch & quit" } }
+      }
+    },
+    "menu.dim.per_monitor": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Per monitor" } }
+      }
+    },
+    "menu.section.layouts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Layouts" } }
+      }
+    },
+    "about.tips.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tips & Tricks" } }
+      }
+    },
+    "about.tips.title_matching.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Two windows of the same app" } }
+      }
+    },
+    "about.tips.title_matching.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Running two Chrome profiles? When you assign an app to a zone (Workspaces) or add it to the ⌥Tab switcher (Interaction), fill in “Window title contains” — e.g. “Work” or “Personal”. Scene then picks the window whose title matches, so each one lands in the right place." } }
+      }
+    },
+    "about.tips.overlap.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Overlapping layouts" } }
+      }
+    },
+    "about.tips.overlap.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "In the layout editor, slots can sit on top of each other — the one later in the list is in front. Select a slot to drag its edges, and use Bring to Front / Send to Back to change the stacking." } }
+      }
+    },
+    "about.tips.dim.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim" } }
+      }
+    },
+    "about.tips.dim.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn Dim on from the menu bar or with its shortcut. “Per monitor” keeps one window visible on every display; off keeps just one overall. Switching to a window that is already visible won’t flash the dim." } }
+      }
+    },
+    "about.tips.displays.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "More than one display" } }
+      }
+    },
+    "about.tips.displays.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "In a workspace, pick a layout for each display and assign apps to its zones. A layout set to “Apply to every display” tiles all screens at once when fired directly." } }
+      }
+    },
+    "about.tips.free_mode.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Free Mode" } }
+      }
+    },
+    "about.tips.free_mode.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pause all of Scene’s automatic behavior from the menu bar when you need windows to stay exactly where you put them." } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {
@@ -5208,7 +5424,7 @@
     "interaction.spotlight.enable": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Dim everything but the active window" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Enable Dim" } }
       }
     },
     "interaction.spotlight.subsection.scope": {
@@ -5304,7 +5520,7 @@
     "interaction.spotlight.hint": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "After you stop switching windows for the delay above, everything except the active window (or app) dims and blurs. Switching away clears it instantly. Works on the windowed desktop only — not Spaces or full-screen apps. Requires Accessibility permission." } }
+        "en": { "stringUnit": { "state": "translated", "value": "After you stop switching windows for the delay below, everything except the active window dims and blurs. Switching to a window that is already visible keeps the dim; clicking anywhere else clears it instantly. Works on the windowed desktop only — not full-screen apps or Spaces. Requires Accessibility permission." } }
       }
     },
     "interaction.spotlight.subsection.experimental": {

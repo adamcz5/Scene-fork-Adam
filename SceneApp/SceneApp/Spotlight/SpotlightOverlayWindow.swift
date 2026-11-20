@@ -5,25 +5,29 @@ import SceneCore
 /// One borderless, click-through, non-activating panel per `NSScreen` that
 /// darkens + blurs the whole screen except the rect(s) punched out of it.
 ///
-/// Visual strength is intentionally hardcoded (see `tintAlpha` / the blur
-/// `material`) — only behavior (on/off, scope, idle delay) is user-tunable,
-/// via `SpotlightConfig`.
+/// Look (darkness, blur preset, fade speed) comes from `SpotlightConfig` via
+/// `apply(config:)`.
 ///
-/// Darkening comes from `tintView` (plain black, `tintAlpha` opacity);
-/// blurring comes from `blurView`, an `NSVisualEffectView` in `.behindWindow`
-/// blending mode, which samples and blurs whatever is actually on screen
-/// underneath this window. Both get their own `CAShapeLayer` mask (same path,
-/// kept in sync) rather than one shared mask on a wrapping container — that
-/// avoids relying on whether a mask set on an ancestor layer correctly
-/// propagates through `NSVisualEffectView`'s internal backdrop-filter layer.
+/// Darkening comes from `tintView` (plain black at `config.darkness`
+/// opacity); blurring comes from `blurView`, an `NSVisualEffectView` in
+/// `.behindWindow` blending mode, which samples and blurs whatever is
+/// actually on screen underneath this window. Both get their own
+/// `CAShapeLayer` mask (same path, kept in sync) rather than one shared mask
+/// on a wrapping container — that avoids relying on whether a mask set on an
+/// ancestor layer correctly propagates through `NSVisualEffectView`'s
+/// internal backdrop-filter layer.
 ///
-/// `updateHoles(excludedFrames:)` expects rects already merged via
+/// `updateHoles(excludedFrames:)` merges its rects via
 /// `RectMerging.mergingOverlapping` — see that type's doc comment for why
 /// overlapping holes must be pre-merged before cutting an even-odd mask.
 final class SpotlightOverlayWindow: NSPanel {
-    static let tintAlpha: CGFloat = 0.45
-    static let showAnimationDuration: TimeInterval = 0.35
-    static let hideAnimationDuration: TimeInterval = 0.15
+    /// Fade durations at `speed == 1`; actual duration is `base / speed`.
+    static let baseShowAnimationDuration: TimeInterval = 0.35
+    static let baseHideAnimationDuration: TimeInterval = 0.15
+
+    private var speed: Double = SpotlightConfig.defaultSpeed
+    private var showAnimationDuration: TimeInterval { Self.baseShowAnimationDuration / speed }
+    private var hideAnimationDuration: TimeInterval { Self.baseHideAnimationDuration / speed }
 
     private let blurView = NSVisualEffectView()
     private let tintView = NSView()
@@ -62,7 +66,7 @@ final class SpotlightOverlayWindow: NSPanel {
         blurView.layer?.mask = blurMask
 
         tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.tintAlpha).cgColor
+        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(SpotlightConfig.defaultDarkness).cgColor
         tintView.layer?.mask = tintMask
 
         let container = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
@@ -79,6 +83,24 @@ final class SpotlightOverlayWindow: NSPanel {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// Pushes the user-tunable look into the views. Safe to call while shown —
+    /// it only changes layer/material properties, not visibility.
+    func apply(config: SpotlightConfig) {
+        speed = min(max(config.speed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
+        let darkness = min(max(config.darkness, 0), 1)
+        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(darkness).cgColor
+        switch config.blurPreset {
+        case .off:
+            blurView.isHidden = true
+        case .light:
+            blurView.isHidden = false
+            blurView.material = .underWindowBackground
+        case .heavy:
+            blurView.isHidden = false
+            blurView.material = .hudWindow
+        }
+    }
 
     /// `excludedFrames` and `reDimFrames` are in the global NS
     /// screen-coordinate system (bottom-left origin, matching
@@ -123,7 +145,7 @@ final class SpotlightOverlayWindow: NSPanel {
     func show() {
         orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Self.showAnimationDuration
+            ctx.duration = showAnimationDuration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             animator().alphaValue = 1
         }
@@ -140,7 +162,7 @@ final class SpotlightOverlayWindow: NSPanel {
             return
         }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = Self.hideAnimationDuration
+            ctx.duration = hideAnimationDuration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             animator().alphaValue = 0
         }, completionHandler: { [weak self] in

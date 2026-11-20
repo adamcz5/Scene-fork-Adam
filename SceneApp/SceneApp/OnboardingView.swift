@@ -28,6 +28,17 @@ struct OnboardingView: View {
                 }
             }
             .keyboardShortcut(.defaultAction)
+
+            // Shown up front, not only in the recovery section below: after an
+            // update or reinstall, flipping the Accessibility toggle off/on does
+            // NOT refresh macOS's record of the app — the entry has to be
+            // removed with "–" and re-added with "+".
+            Text("onboarding.accessibility.remove_readd.body")
+                .font(.caption)
+                .bold()
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
+
             Button("onboarding.accessibility.check_again") {
                 onGrant()
             }
@@ -50,18 +61,6 @@ struct OnboardingView: View {
                     .font(.caption)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: 420)
-
-                // Try-this-first step, ahead of the terminal fallback below.
-                // Flipping the Accessibility toggle off/on in System Settings
-                // does NOT refresh macOS's stored record of the app after an
-                // update — it has to be removed with "–" and re-added with
-                // "+" (re-selecting Scene Fork.app) for the new binary to be
-                // recognized.
-                Text("onboarding.accessibility.remove_readd.body")
-                    .font(.caption)
-                    .bold()
-                    .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
 
                 HStack(spacing: 8) {
@@ -93,7 +92,7 @@ struct OnboardingView: View {
             }
         }
         .padding(32)
-        .frame(width: 500, height: 500)
+        .frame(width: 500, height: 560)
     }
 
     private func copyResetCommand() {

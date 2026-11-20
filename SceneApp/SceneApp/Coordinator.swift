@@ -534,6 +534,25 @@ final class Coordinator: ObservableObject {
                 }
             )
         }
+        if let binding = settingsStore.spotlight.hotkey, claim(binding) {
+            hotkeyManager.register(
+                uuid: Self.toggleSpotlightHotkeyUUID,
+                keyCode: binding.keyCode,
+                modifiers: binding.carbonModifiers,
+                handler: { [weak self] in
+                    Task { @MainActor in self?.toggleSpotlight() }
+                }
+            )
+        }
+    }
+
+    /// Flips Spotlight (dim) on/off, leaving every other setting — including
+    /// the single/per-monitor mode — as it was, so toggling back on restores
+    /// exactly what the user had.
+    private func toggleSpotlight() {
+        var config = settingsStore.spotlight
+        config.enabled.toggle()
+        try? settingsStore.setSpotlight(config)
     }
 
     /// Fixed identifier for `HotkeyManager.register` — the Quick Picker hotkey
@@ -541,6 +560,9 @@ final class Coordinator: ObservableObject {
     /// one instead (never collides: `Workspace`/`CustomLayout` IDs are always
     /// freshly generated `UUID()`s).
     private static let quickPickerHotkeyUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+    /// Synthetic identifier for the Spotlight toggle hotkey, same reasoning as above.
+    private static let toggleSpotlightHotkeyUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
 
     // MARK: - Drag-to-swap lifecycle
 

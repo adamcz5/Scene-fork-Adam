@@ -3,7 +3,15 @@ import SceneCore
 
 struct InteractionTab: View {
     @EnvironmentObject var settingsVM: SettingsStoreViewModel
+    @EnvironmentObject var layoutVM: LayoutStoreViewModel
+    @EnvironmentObject var workspaceVM: WorkspaceStoreViewModel
+    let calendarPermissionRequester: () async -> Bool
     @State private var previewToggle: Bool = false
+    @State private var triggersExpanded: Bool = false
+    @State private var triggerWorkspaceID: UUID?
+    @State private var triggerDraft: [WorkspaceTrigger] = []
+    @State private var triggerSavedBaseline: [WorkspaceTrigger] = []
+    @State private var triggerSaveError: String?
 
     /// Replaced the earlier `Form { Section { ... } }` layout: on this
     /// window, `Form`'s native macOS section chrome rendered as plain
@@ -21,6 +29,7 @@ struct InteractionTab: View {
                 dragSwapCard
                 appSwitcherCard
                 spotlightCard
+                workspaceTriggersCard
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,36 +122,57 @@ struct InteractionTab: View {
         }
     }
 
-    /// Spotlight gets its own, larger card (per user ask) — it's grown to
-    /// cover exclusion scope (window vs. app) AND, independently, how many
-    /// exclusion targets exist at once when multiple displays are connected
-    /// (single vs. per-monitor). Each axis gets its own labeled sub-block so
-    /// they don't read as one setting.
+    /// Spotlight (dim) card. Everything here is a plain on/off or a single
+    /// slider/picker — no setting overrides another.
     private var spotlightCard: some View {
         card("interaction.spotlight.section", hint: "interaction.spotlight.section.hint") {
-            Toggle("interaction.spotlight.enable", isOn: spotlightEnabledBinding)
+            Toggle("interaction.spotlight.enable", isOn: spotlightBinding(\.enabled))
 
-            subBlock("interaction.spotlight.subsection.scope", hint: "interaction.spotlight.scope.hint") {
-                Picker("interaction.spotlight.scope", selection: spotlightScopeBinding) {
-                    Text("interaction.spotlight.scope.window").tag(SpotlightScope.activeWindow)
-                    Text("interaction.spotlight.scope.app").tag(SpotlightScope.activeApp)
-                }
-                .pickerStyle(.segmented)
+            Toggle("interaction.spotlight.per_monitor", isOn: perMonitorBinding)
                 .disabled(!settingsVM.spotlight.enabled)
-            }
+            Text("interaction.spotlight.per_monitor.hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
 
-            subBlock("interaction.spotlight.subsection.monitors", hint: "interaction.spotlight.exclusion_mode.hint") {
-                Picker("interaction.spotlight.exclusion_mode", selection: spotlightExclusionModeBinding) {
-                    Text("interaction.spotlight.exclusion_mode.single").tag(SpotlightExclusionMode.single)
-                    Text("interaction.spotlight.exclusion_mode.per_monitor").tag(SpotlightExclusionMode.perMonitor)
-                }
-                .pickerStyle(.segmented)
-                .disabled(!settingsVM.spotlight.enabled)
-            }
-
-            subBlock("interaction.spotlight.subsection.delay") {
+            subBlock("interaction.spotlight.subsection.look") {
                 Slider(
-                    value: spotlightDelayBinding,
+                    value: spotlightBinding(\.darkness),
+                    in: SpotlightConfig.minDarkness...SpotlightConfig.maxDarkness,
+                    step: 0.05
+                ) {
+                    Text("interaction.spotlight.darkness")
+                } minimumValueLabel: {
+                    Text("interaction.spotlight.darkness.min")
+                } maximumValueLabel: {
+                    Text("interaction.spotlight.darkness.max")
+                }
+                .disabled(!settingsVM.spotlight.enabled)
+
+                Picker("interaction.spotlight.blur", selection: spotlightBinding(\.blurPreset)) {
+                    Text("interaction.spotlight.blur.off").tag(SpotlightBlurPreset.off)
+                    Text("interaction.spotlight.blur.light").tag(SpotlightBlurPreset.light)
+                    Text("interaction.spotlight.blur.heavy").tag(SpotlightBlurPreset.heavy)
+                }
+                .pickerStyle(.segmented)
+                .disabled(!settingsVM.spotlight.enabled)
+
+                Slider(
+                    value: spotlightBinding(\.speed),
+                    in: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed,
+                    step: 0.25
+                ) {
+                    Text("interaction.spotlight.speed")
+                } minimumValueLabel: {
+                    Text("interaction.spotlight.speed.min")
+                } maximumValueLabel: {
+                    Text("interaction.spotlight.speed.max")
+                }
+                .disabled(!settingsVM.spotlight.enabled)
+            }
+
+            subBlock("interaction.spotlight.subsection.delay", hint: "interaction.spotlight.delay.hint") {
+                Slider(
+                    value: spotlightBinding(\.idleDelaySeconds),
                     in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
                     step: 0.5
                 ) {
@@ -159,14 +189,118 @@ struct InteractionTab: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
+            subBlock("interaction.spotlight.subsection.hotkey", hint: "interaction.spotlight.hotkey.hint") {
+                HotkeyField(
+                    chord: spotlightBinding(\.hotkey),
+                    label: "interaction.spotlight.hotkey",
+                    validate: validateSpotlightHotkey
+                )
+            }
+
             subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
-                Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightDimBrowserChromeBinding)
+                Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightBinding(\.dimBrowserChrome))
                     .disabled(!settingsVM.spotlight.enabled)
             }
 
             Text("interaction.spotlight.hint")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Workspace triggers (relocated from the Workspace editor)
+
+    /// Automatic workspace activation (monitor connect/disconnect, time of
+    /// day, calendar event). Edited here rather than in the Workspace editor to
+    /// keep that form focused; collapsed by default since most people never
+    /// touch it. The data still lives on each `Workspace`.
+    private var workspaceTriggersCard: some View {
+        card("interaction.triggers.section", hint: "interaction.triggers.section.hint") {
+            DisclosureGroup("interaction.triggers.expand", isExpanded: $triggersExpanded) {
+                if workspaceVM.workspaces.isEmpty {
+                    Text("interaction.triggers.empty")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Picker("interaction.triggers.workspace", selection: triggerWorkspaceBinding) {
+                            ForEach(workspaceVM.workspaces) { workspace in
+                                Text(workspace.name).tag(workspace.id)
+                            }
+                        }
+                        WorkspaceTriggerEditor(
+                            triggers: $triggerDraft,
+                            calendarPermissionRequester: calendarPermissionRequester
+                        )
+                        if let triggerSaveError {
+                            Text(triggerSaveError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        HStack {
+                            Spacer()
+                            if triggerDraft != triggerSavedBaseline {
+                                Text("workspace.editor.unsaved")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Button("workspace.editor.save", action: saveTriggers)
+                                .disabled(triggerDraft == triggerSavedBaseline)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+        }
+        .onAppear(perform: loadTriggerDraft)
+        .onChange(of: workspaceVM.workspaces) { _, _ in loadTriggerDraft() }
+    }
+
+    private var effectiveTriggerWorkspaceID: UUID? {
+        if let id = triggerWorkspaceID, workspaceVM.workspaces.contains(where: { $0.id == id }) { return id }
+        return workspaceVM.workspaces.first?.id
+    }
+
+    private var triggerWorkspaceBinding: Binding<UUID> {
+        Binding(
+            get: { effectiveTriggerWorkspaceID ?? UUID() },
+            set: { id in
+                // Switching workspaces discards any unsaved edits to the
+                // previous one, so reset both before reloading.
+                triggerWorkspaceID = id
+                triggerDraft = []
+                triggerSavedBaseline = []
+                loadTriggerDraft()
+            }
+        )
+    }
+
+    private func loadTriggerDraft() {
+        guard let id = effectiveTriggerWorkspaceID,
+              let workspace = workspaceVM.workspaces.first(where: { $0.id == id })
+        else {
+            triggerDraft = []
+            triggerSavedBaseline = []
+            return
+        }
+        // Don't clobber in-progress edits when an unrelated store change fires.
+        if triggerDraft != triggerSavedBaseline { return }
+        triggerDraft = workspace.triggers
+        triggerSavedBaseline = workspace.triggers
+        triggerSaveError = nil
+    }
+
+    private func saveTriggers() {
+        guard let id = effectiveTriggerWorkspaceID,
+              var workspace = workspaceVM.workspaces.first(where: { $0.id == id })
+        else { return }
+        workspace.triggers = triggerDraft
+        do {
+            try workspaceVM.update(workspace)
+            triggerSavedBaseline = triggerDraft
+            triggerSaveError = nil
+        } catch {
+            triggerSaveError = error.localizedDescription
         }
     }
 
@@ -336,54 +470,45 @@ struct InteractionTab: View {
         )
     }
 
-    private var spotlightEnabledBinding: Binding<Bool> {
+    /// Read/write binding to one field of `SpotlightConfig`. Edits a COPY of
+    /// the current config and saves the whole thing, so every other field —
+    /// including ones this view doesn't show — is always carried through.
+    private func spotlightBinding<T>(_ keyPath: WritableKeyPath<SpotlightConfig, T>) -> Binding<T> {
         Binding(
-            get: { settingsVM.spotlight.enabled },
-            set: { v in
-                let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: v, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
+            get: { settingsVM.spotlight[keyPath: keyPath] },
+            set: { value in
+                var config = settingsVM.spotlight
+                config[keyPath: keyPath] = value
+                try? settingsVM.store.setSpotlight(config)
             }
         )
     }
 
-    private var spotlightScopeBinding: Binding<SpotlightScope> {
+    private var perMonitorBinding: Binding<Bool> {
         Binding(
-            get: { settingsVM.spotlight.scope },
-            set: { v in
-                let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: v, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
+            get: { settingsVM.spotlight.exclusionMode == .perMonitor },
+            set: { on in
+                var config = settingsVM.spotlight
+                config.exclusionMode = on ? .perMonitor : .single
+                try? settingsVM.store.setSpotlight(config)
             }
         )
     }
 
-    private var spotlightDelayBinding: Binding<Double> {
-        Binding(
-            get: { settingsVM.spotlight.idleDelaySeconds },
-            set: { v in
-                let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: v, exclusionMode: c.exclusionMode, dimBrowserChrome: c.dimBrowserChrome))
-            }
-        )
-    }
-
-    private var spotlightExclusionModeBinding: Binding<SpotlightExclusionMode> {
-        Binding(
-            get: { settingsVM.spotlight.exclusionMode },
-            set: { v in
-                let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: v, dimBrowserChrome: c.dimBrowserChrome))
-            }
-        )
-    }
-
-    private var spotlightDimBrowserChromeBinding: Binding<Bool> {
-        Binding(
-            get: { settingsVM.spotlight.dimBrowserChrome },
-            set: { v in
-                let c = settingsVM.spotlight
-                try? settingsVM.store.setSpotlight(SpotlightConfig(enabled: c.enabled, scope: c.scope, idleDelaySeconds: c.idleDelaySeconds, exclusionMode: c.exclusionMode, dimBrowserChrome: v))
-            }
-        )
+    /// Refuses a chord already bound to a layout, a workspace, or the Quick
+    /// Picker — otherwise the later registration would silently lose.
+    private func validateSpotlightHotkey(_ binding: HotkeyBinding) -> String? {
+        let format = String(localized: "hotkeys.conflict")
+        if let layout = layoutVM.layouts.first(where: { $0.hotkey == binding }) {
+            return String(format: format, layout.name)
+        }
+        if let workspace = workspaceVM.workspaces.first(where: { $0.hotkey == binding }) {
+            return String(format: format, workspace.name)
+        }
+        if settingsVM.quickPickerHotkey == binding {
+            return String(format: format, String(localized: "hotkeys.quick_picker.label"))
+        }
+        return nil
     }
 
     private func label(for curve: EasingCurve) -> String {

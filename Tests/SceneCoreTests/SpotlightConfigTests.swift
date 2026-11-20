@@ -2,18 +2,28 @@ import XCTest
 @testable import SceneCore
 
 final class SpotlightConfigTests: XCTestCase {
-    func testDefaultIsDisabledActiveWindow() {
-        XCTAssertFalse(SpotlightConfig.default.enabled)
-        XCTAssertEqual(SpotlightConfig.default.scope, .activeWindow)
-        XCTAssertEqual(SpotlightConfig.default.idleDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
-        XCTAssertEqual(SpotlightConfig.default.exclusionMode, .single)
-        XCTAssertFalse(SpotlightConfig.default.dimBrowserChrome)
+    func testDefaultIsDisabledSingleWithStandardLook() {
+        let d = SpotlightConfig.default
+        XCTAssertFalse(d.enabled)
+        XCTAssertEqual(d.exclusionMode, .single)
+        XCTAssertEqual(d.idleDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
+        XCTAssertEqual(d.darkness, SpotlightConfig.defaultDarkness)
+        XCTAssertEqual(d.blurPreset, .heavy)
+        XCTAssertEqual(d.speed, SpotlightConfig.defaultSpeed)
+        XCTAssertNil(d.hotkey)
+        XCTAssertFalse(d.dimBrowserChrome)
     }
 
     func testCodableRoundTrip() throws {
         let original = SpotlightConfig(
-            enabled: true, scope: .activeApp, idleDelaySeconds: 5,
-            exclusionMode: .perMonitor, dimBrowserChrome: true
+            enabled: true,
+            exclusionMode: .perMonitor,
+            idleDelaySeconds: 5,
+            darkness: 0.7,
+            blurPreset: .light,
+            speed: 2,
+            hotkey: HotkeyBinding(keyCode: 2, modifiers: [.command, .option]),
+            dimBrowserChrome: true
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)
@@ -30,18 +40,20 @@ final class SpotlightConfigTests: XCTestCase {
         let data = #"{"enabled":true}"#.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)
         XCTAssertTrue(decoded.enabled)
-        XCTAssertEqual(decoded.scope, .activeWindow)
-        XCTAssertEqual(decoded.idleDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
         XCTAssertEqual(decoded.exclusionMode, .single)
-        XCTAssertFalse(decoded.dimBrowserChrome)
+        XCTAssertEqual(decoded.idleDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
+        XCTAssertEqual(decoded.darkness, SpotlightConfig.defaultDarkness)
+        XCTAssertEqual(decoded.blurPreset, .heavy)
     }
 
-    /// A file written by a build before `exclusionMode` existed — same as
-    /// `testMissingKeysDecodeToDefaults` but spelled out explicitly so the
-    /// upgrade path stays documented even if the defaults test changes shape.
-    func testLegacyJSONWithoutExclusionModeDecodesToSingle() throws {
-        let data = #"{"enabled":true,"scope":"activeApp","idleDelaySeconds":4}"#.data(using: .utf8)!
+    /// A file written by an older build, which still had the (since removed)
+    /// `scope` key and none of the look/hotkey fields.
+    func testLegacyJSONWithRemovedScopeKeyStillDecodes() throws {
+        let data = #"{"enabled":true,"scope":"activeApp","idleDelaySeconds":4,"exclusionMode":"perMonitor"}"#.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)
-        XCTAssertEqual(decoded.exclusionMode, .single)
+        XCTAssertTrue(decoded.enabled)
+        XCTAssertEqual(decoded.idleDelaySeconds, 4)
+        XCTAssertEqual(decoded.exclusionMode, .perMonitor)
+        XCTAssertEqual(decoded.darkness, SpotlightConfig.defaultDarkness)
     }
 }
