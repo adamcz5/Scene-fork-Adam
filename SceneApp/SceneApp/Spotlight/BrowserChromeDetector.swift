@@ -1,5 +1,6 @@
 import ApplicationServices
 import CoreGraphics
+import SceneCore
 
 /// EXPERIMENTAL, heuristic-only: looks inside a browser window's AX tree for
 /// its own chrome — tab strip, address bar/toolbar, bookmark bar — so
