@@ -2,8 +2,7 @@ import SwiftUI
 import SceneCore
 
 /// Workspace editor — basics (name / hotkey), displays & layouts (layout and
-/// zone→app assignment per display),
-/// focus (Shortcut names), and collapsed launch/quit lists. Saved to the store via
+/// zone→app assignment per display) and collapsed launch/quit lists. Saved to the store via
 /// `WorkspaceStoreViewModel.update(_:)` which enforces strict update semantics
 /// (throws on missing ID) and cross-store hotkey conflict detection.
 ///
@@ -77,31 +76,6 @@ struct WorkspaceEditorView: View {
                 Text(enforcementDescription(for: draft.enforcementMode))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            Section("workspace.editor.section.focus") {
-                TextField(
-                    "workspace.editor.focus.shortcut_on",
-                    text: .init(
-                        get: { draft.focusMode?.shortcutNameOn ?? "" },
-                        set: { newValue in
-                            var f = draft.focusMode ?? FocusModeReference()
-                            f.shortcutNameOn = newValue.isEmpty ? nil : newValue
-                            draft.focusMode = (f.shortcutNameOn == nil && f.shortcutNameOff == nil) ? nil : f
-                        }
-                    )
-                )
-                TextField(
-                    "workspace.editor.focus.shortcut_off",
-                    text: .init(
-                        get: { draft.focusMode?.shortcutNameOff ?? "" },
-                        set: { newValue in
-                            var f = draft.focusMode ?? FocusModeReference()
-                            f.shortcutNameOff = newValue.isEmpty ? nil : newValue
-                            draft.focusMode = (f.shortcutNameOn == nil && f.shortcutNameOff == nil) ? nil : f
-                        }
-                    )
-                )
-                Text("workspace.editor.focus.hint").font(.caption).foregroundStyle(.secondary)
             }
             // Launch/quit lists are workspace-wide (not per display) and rarely
             // touched, so they sit collapsed at the bottom. Automatic triggers

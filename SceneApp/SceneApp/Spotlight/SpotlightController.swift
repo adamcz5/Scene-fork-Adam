@@ -170,6 +170,14 @@ final class SpotlightController {
             return
         }
 
+        // A Chromium browser only builds its accessibility tree once asked, and
+        // the tree takes a moment to fill in — start that now, long before the
+        // dim fades in, so the top bar can actually be found by then.
+        if config.dimBrowserChrome,
+           BrowserChromeDetector.isCandidate(bundleID: NSRunningApplication(processIdentifier: pid)?.bundleIdentifier) {
+            BrowserChromeDetector.prepare(pid: pid)
+        }
+
         let element = AXUIElementCreateApplication(pid)
         appElement = element
 
@@ -377,7 +385,15 @@ final class SpotlightController {
         guard let pid, let windowElement,
               let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
         else { return [] }
-        return BrowserChromeDetector.chromeRegions(windowElement: windowElement, bundleID: bundleID) ?? []
+        // Idempotent; covers the case where the setting was switched on while
+        // this browser was already frontmost.
+        if BrowserChromeDetector.isCandidate(bundleID: bundleID) { BrowserChromeDetector.prepare(pid: pid) }
+        return BrowserChromeDetector.chromeRegions(
+            windowElement: windowElement,
+            bundleID: bundleID,
+            mode: config.browserChromeMode,
+            fixedHeight: config.browserChromeHeight
+        ) ?? []
     }
 
     /// Remembers which screen a just-focused window landed on, so

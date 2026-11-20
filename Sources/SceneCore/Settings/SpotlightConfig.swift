@@ -23,6 +23,18 @@ public enum SpotlightBlurPreset: String, Codable, CaseIterable, Sendable {
     case heavy
 }
 
+/// How the browser's own top bar (tabs, address bar, bookmarks) is found when
+/// `SpotlightConfig.dimBrowserChrome` is on.
+public enum SpotlightChromeMode: String, Codable, CaseIterable, Sendable {
+    /// Ask the browser (via accessibility) where the page itself is; everything
+    /// above it in the window is the top bar. Adapts to a bookmarks bar being
+    /// shown or hidden, but depends on the browser exposing that information.
+    case automatic
+    /// Dim a fixed number of points down from the top of the window. Always
+    /// works, but doesn't adapt if the toolbars change height.
+    case fixedHeight
+}
+
 /// User-tunable settings for "Spotlight" — a dim+blur overlay that darkens
 /// everything except the window you're currently working in.
 ///
@@ -55,6 +67,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// this is best-effort and silently does nothing for browsers/windows it
     /// doesn't recognize.
     public var dimBrowserChrome: Bool
+    public var browserChromeMode: SpotlightChromeMode
+    /// Height in points of the dimmed top strip in `.fixedHeight` mode.
+    public var browserChromeHeight: Double
+
+    public static let minChromeHeight: Double = 40
+    public static let maxChromeHeight: Double = 220
+    public static let defaultChromeHeight: Double = 90
 
     public static let minIdleDelaySeconds: Double = 1
     public static let maxIdleDelaySeconds: Double = 8
@@ -81,7 +100,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         blurPreset: SpotlightBlurPreset = .heavy,
         speed: Double = SpotlightConfig.defaultSpeed,
         hotkey: HotkeyBinding? = nil,
-        dimBrowserChrome: Bool = false
+        dimBrowserChrome: Bool = false,
+        browserChromeMode: SpotlightChromeMode = .automatic,
+        browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -91,10 +112,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.speed = speed
         self.hotkey = hotkey
         self.dimBrowserChrome = dimBrowserChrome
+        self.browserChromeMode = browserChromeMode
+        self.browserChromeHeight = browserChromeHeight
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabled, exclusionMode, idleDelaySeconds, darkness, blurPreset, speed, hotkey, dimBrowserChrome
+        case browserChromeMode, browserChromeHeight
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -112,6 +136,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? Self.defaultSpeed
         self.hotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .hotkey)
         self.dimBrowserChrome = try c.decodeIfPresent(Bool.self, forKey: .dimBrowserChrome) ?? false
+        self.browserChromeMode = try c.decodeIfPresent(SpotlightChromeMode.self, forKey: .browserChromeMode) ?? .automatic
+        self.browserChromeHeight = try c.decodeIfPresent(Double.self, forKey: .browserChromeHeight) ?? Self.defaultChromeHeight
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -124,5 +150,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(speed, forKey: .speed)
         try c.encodeIfPresent(hotkey, forKey: .hotkey)
         try c.encode(dimBrowserChrome, forKey: .dimBrowserChrome)
+        try c.encode(browserChromeMode, forKey: .browserChromeMode)
+        try c.encode(browserChromeHeight, forKey: .browserChromeHeight)
     }
 }

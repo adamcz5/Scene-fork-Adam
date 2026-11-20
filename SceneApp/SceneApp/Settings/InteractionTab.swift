@@ -12,6 +12,8 @@ struct InteractionTab: View {
     @State private var triggerDraft: [WorkspaceTrigger] = []
     @State private var triggerSavedBaseline: [WorkspaceTrigger] = []
     @State private var triggerSaveError: String?
+    @State private var chromeTestResult: String?
+    @State private var isTestingChrome = false
 
     /// Replaced the earlier `Form { Section { ... } }` layout: on this
     /// window, `Form`'s native macOS section chrome rendered as plain
@@ -200,11 +202,79 @@ struct InteractionTab: View {
             subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
                 Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightBinding(\.dimBrowserChrome))
                     .disabled(!settingsVM.spotlight.enabled)
+
+                if settingsVM.spotlight.dimBrowserChrome {
+                    Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
+                        Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
+                        Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!settingsVM.spotlight.enabled)
+
+                    if settingsVM.spotlight.browserChromeMode == .fixedHeight {
+                        Slider(
+                            value: spotlightBinding(\.browserChromeHeight),
+                            in: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight,
+                            step: 2
+                        ) {
+                            Text("interaction.spotlight.chrome.height")
+                        } minimumValueLabel: {
+                            Text("interaction.spotlight.chrome.height.min")
+                        } maximumValueLabel: {
+                            Text("interaction.spotlight.chrome.height.max")
+                        }
+                        Text(String(format: String(localized: "interaction.spotlight.chrome.height.value"), Int(settingsVM.spotlight.browserChromeHeight)))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button("interaction.spotlight.chrome.test") { runChromeTest() }
+                            .controlSize(.small)
+                            .disabled(isTestingChrome)
+                        if isTestingChrome {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                    if let chromeTestResult {
+                        Text(chromeTestResult)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
 
             Text("interaction.spotlight.hint")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Reports what automatic detection finds in each open supported browser.
+    /// Switches the browser's accessibility tree on first and waits a moment
+    /// for it to fill in, so a first run isn't a false "not found".
+    private func runChromeTest() {
+        isTestingChrome = true
+        chromeTestResult = nil
+        for app in NSWorkspace.shared.runningApplications
+        where BrowserChromeDetector.isCandidate(bundleID: app.bundleIdentifier) {
+            BrowserChromeDetector.prepare(pid: app.processIdentifier)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            let detections = BrowserChromeDetector.detectRunningBrowsers()
+            if detections.isEmpty {
+                chromeTestResult = String(localized: "interaction.spotlight.chrome.test.none")
+            } else {
+                chromeTestResult = detections.map { detection in
+                    if let height = detection.topBarHeight {
+                        return String(format: String(localized: "interaction.spotlight.chrome.test.found"), detection.appName, Int(height))
+                    }
+                    return String(format: String(localized: "interaction.spotlight.chrome.test.not_found"), detection.appName)
+                }.joined(separator: "\n")
+            }
+            isTestingChrome = false
         }
     }
 

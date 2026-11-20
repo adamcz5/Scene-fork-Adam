@@ -5505,6 +5505,90 @@
         "en": { "stringUnit": { "state": "translated", "value": "Remove this display" } }
       }
     },
+    "hotkeys.section.dim": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim" } }
+      }
+    },
+    "hotkeys.section.focus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workspace Focus Shortcuts" } }
+      }
+    },
+    "hotkeys.focus.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Runs a macOS Shortcut from the Shortcuts app when a workspace turns on or off — typically one that switches a Focus. Type the Shortcut's exact name; leave a field empty to do nothing." } }
+      }
+    },
+    "interaction.spotlight.chrome.mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Detection" } }
+      }
+    },
+    "interaction.spotlight.chrome.mode.auto": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic" } }
+      }
+    },
+    "interaction.spotlight.chrome.mode.fixed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fixed height" } }
+      }
+    },
+    "interaction.spotlight.chrome.height": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top bar height" } }
+      }
+    },
+    "interaction.spotlight.chrome.height.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Short" } }
+      }
+    },
+    "interaction.spotlight.chrome.height.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tall" } }
+      }
+    },
+    "interaction.spotlight.chrome.height.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld pt" } }
+      }
+    },
+    "interaction.spotlight.chrome.test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Test on open browser" } }
+      }
+    },
+    "interaction.spotlight.chrome.test.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No supported browser (Chrome, Edge, Brave, Arc, Vivaldi) has a window open." } }
+      }
+    },
+    "interaction.spotlight.chrome.test.found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@: found the page — the top bar is %lld pt tall." } }
+      }
+    },
+    "interaction.spotlight.chrome.test.not_found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@: couldn't see where the page starts. Try “Fixed height” instead." } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {
@@ -5628,7 +5712,7 @@
     "interaction.spotlight.dim_browser_chrome.hint": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Re-darkens just the tab strip, address bar, and bookmark bar inside an undimmed Chrome/Chromium-based browser window, so only the page content stays fully visible. Heuristic and best-effort — recognizes Chrome, Edge, Brave, Arc, and Vivaldi; does nothing (safely) in Safari, Firefox, or any other app." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Keeps the browser's tab strip, address bar and bookmarks dimmed while the page itself stays clear. Works with Chrome, Edge, Brave, Arc and Vivaldi. Automatic asks the browser where the page starts; if that doesn't work for you, use Fixed height and set how far down to dim." } }
       }
     },
     "layouts.editor.quick_picker.show": {
