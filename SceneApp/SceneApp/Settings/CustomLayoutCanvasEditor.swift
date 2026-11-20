@@ -54,6 +54,11 @@ struct CustomLayoutCanvasEditor: View {
 
             canvas
 
+            Toggle("layouts.editor.apply_all_screens", isOn: $draft.applyToAllScreens)
+            Text("layouts.editor.apply_all_screens.hint")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Spacer(minLength: 0)
 
             HStack {

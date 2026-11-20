@@ -267,12 +267,29 @@ final class Coordinator: ObservableObject {
         return performApplyLayout(custom, assignments: assignments, source: source)
     }
 
+    /// V0.11 multi-monitor: a Layout fired directly (hotkey/menu/Quick
+    /// Picker — not through a Workspace, which already has its own
+    /// per-display override via `Workspace.displayLayouts` and
+    /// `WorkspaceActivator`) normally targets only
+    /// `ScreenResolver.activeScreen()`. `CustomLayout.applyToAllScreens`
+    /// opts a layout into applying independently to every connected screen
+    /// instead — same per-screen `performApplyLayout(_:on:...)` call this
+    /// already made once, just looped, mirroring how `WorkspaceActivator`
+    /// iterates `NSScreen.screens` for `displayLayouts`.
     private func performApplyLayout(
         _ custom: CustomLayout,
         assignments: [WorkspaceSlotAssignment],
         source: LayoutFiredPayload.Source
     ) -> Bool {
-        return performApplyLayout(custom, on: ScreenResolver.activeScreen(), assignments: assignments, source: source)
+        guard custom.applyToAllScreens else {
+            return performApplyLayout(custom, on: ScreenResolver.activeScreen(), assignments: assignments, source: source)
+        }
+        var anyApplied = false
+        for screen in NSScreen.screens {
+            let applied = performApplyLayout(custom, on: screen, assignments: assignments, source: source)
+            anyApplied = anyApplied || applied
+        }
+        return anyApplied
     }
 
     /// "Reset Layout" — re-applies whatever was applied most recently, but

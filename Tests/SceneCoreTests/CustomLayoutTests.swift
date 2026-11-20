@@ -268,4 +268,44 @@ final class CustomLayoutTests: XCTestCase {
         let decoded = try JSONDecoder().decode(CustomLayout.self, from: data)
         XCTAssertNil(decoded.freeformSlots)
     }
+
+    // MARK: - V0.11 applyToAllScreens (multi-monitor)
+
+    func testApplyToAllScreensDefaultsFalse() {
+        let custom = CustomLayout(
+            id: UUID(), name: "Halves", template: .twoCol, slotProportions: [0.5],
+            hotkey: nil, isPresetSeed: false, isModified: false
+        )
+        XCTAssertFalse(custom.applyToAllScreens)
+    }
+
+    func testApplyToAllScreensCodableRoundTrip() throws {
+        let original = CustomLayout(
+            id: UUID(), name: "Halves", template: .twoCol, slotProportions: [0.5],
+            hotkey: nil, isPresetSeed: false, isModified: false,
+            applyToAllScreens: true
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: data)
+        XCTAssertEqual(decoded, original)
+        XCTAssertTrue(decoded.applyToAllScreens)
+    }
+
+    func testLegacyJSONWithoutApplyToAllScreensKeyDecodesFalse() throws {
+        // Pre-V0.11 JSON lacks `applyToAllScreens` entirely — must default false.
+        let legacyJSON = #"""
+        {
+          "id": "11111111-0001-0000-0000-000000000001",
+          "name": "Halves",
+          "template": "twoCol",
+          "slotProportions": [0.5],
+          "hotkey": null,
+          "isPresetSeed": true,
+          "isModified": false
+        }
+        """#
+        let data = legacyJSON.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: data)
+        XCTAssertFalse(decoded.applyToAllScreens)
+    }
 }

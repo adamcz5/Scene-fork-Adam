@@ -20,7 +20,8 @@ public enum ExportSanitizer {
             isPresetSeed: layout.isPresetSeed,
             isModified: layout.isModified,
             hasCustomTree: layout.customTree != nil,
-            hasFreeformSlots: !(layout.freeformSlots ?? []).isEmpty
+            hasFreeformSlots: !(layout.freeformSlots ?? []).isEmpty,
+            applyToAllScreens: layout.applyToAllScreens
         )
     }
 

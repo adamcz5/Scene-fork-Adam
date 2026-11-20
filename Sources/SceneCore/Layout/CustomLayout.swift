@@ -28,6 +28,14 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
     /// Defaults to `true` so existing/new Layouts show up without extra setup,
     /// mirroring `Workspace.showInQuickPicker`'s same default-on convention.
     public var showInQuickPicker: Bool
+    /// V0.11 multi-monitor: when `true`, firing this Layout directly (hotkey,
+    /// menu bar, or Quick Picker — i.e. NOT through a Workspace, which already
+    /// has its own per-display override via `Workspace.displayLayouts`)
+    /// applies it independently to EVERY connected screen at once instead of
+    /// only `ScreenResolver.activeScreen()` (the screen under the mouse).
+    /// Defaults to `false` so every layout created before this field existed
+    /// keeps its single-screen behavior unchanged.
+    public var applyToAllScreens: Bool
 
     public init(
         id: UUID, name: String, template: LayoutTemplate,
@@ -35,7 +43,8 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         isPresetSeed: Bool, isModified: Bool,
         customTree: LayoutNode? = nil,
         freeformSlots: [FreeformSlot]? = nil,
-        showInQuickPicker: Bool = true
+        showInQuickPicker: Bool = true,
+        applyToAllScreens: Bool = false
     ) {
         self.id = id; self.name = name; self.template = template
         self.slotProportions = slotProportions; self.hotkey = hotkey
@@ -43,6 +52,7 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         self.customTree = customTree
         self.freeformSlots = freeformSlots
         self.showInQuickPicker = showInQuickPicker
+        self.applyToAllScreens = applyToAllScreens
     }
 
     /// Builds a `Layout` value for `LayoutEngine.plan`. The synthesized `Layout.id` is `.full`
@@ -67,7 +77,8 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, template, slotProportions, hotkey,
-             isPresetSeed, isModified, customTree, freeformSlots, showInQuickPicker
+             isPresetSeed, isModified, customTree, freeformSlots, showInQuickPicker,
+             applyToAllScreens
     }
 
     /// Decodes legacy JSON (pre-V0.7) that lacks `customTree`/`freeformSlots`,
@@ -84,6 +95,7 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         self.customTree = try c.decodeIfPresent(LayoutNode.self, forKey: .customTree)
         self.freeformSlots = try c.decodeIfPresent([FreeformSlot].self, forKey: .freeformSlots)
         self.showInQuickPicker = try c.decodeIfPresent(Bool.self, forKey: .showInQuickPicker) ?? true
+        self.applyToAllScreens = try c.decodeIfPresent(Bool.self, forKey: .applyToAllScreens) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -102,5 +114,6 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         try c.encodeIfPresent(customTree, forKey: .customTree)
         try c.encodeIfPresent(freeformSlots, forKey: .freeformSlots)
         try c.encode(showInQuickPicker, forKey: .showInQuickPicker)
+        try c.encode(applyToAllScreens, forKey: .applyToAllScreens)
     }
 }

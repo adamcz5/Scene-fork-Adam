@@ -5171,6 +5171,18 @@
         "en": { "stringUnit": { "state": "translated", "value": "Lets you arrange whatever's open into this layout from the Quick Picker's Layouts row." } }
       }
     },
+    "layouts.editor.apply_all_screens": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apply to every display" } }
+      }
+    },
+    "layouts.editor.apply_all_screens.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Firing this layout from a hotkey, the menu bar, or the Quick Picker applies it to every connected display at once, not just the one under your mouse." } }
+      }
+    },
     "app_switcher.window.untitled": {
       "extractionState": "manual",
       "localizations": {
