@@ -9,7 +9,7 @@ import SceneCore
 /// Filtered to `Workspace.showInQuickPicker`.
 ///
 /// Row 2 ("Layouts"): Layouts filtered to `CustomLayout.showInQuickPicker`
-/// (toggled per-Layout from `LayoutEditorView`, mirroring the Workspace
+/// (toggled per-Layout from the layout editor, mirroring the Workspace
 /// flag). Clicking one shows the ⌥Tab app switcher's own configured entries
 /// (`SettingsStoreViewModel.appSwitcher.entries`) as a row of icons; clicking
 /// them IN ORDER assigns them left-to-right into the layout's zones — no

@@ -12,12 +12,16 @@ import SceneCore
 struct LayoutPickerView: View {
     @Binding var selectedID: UUID
     @ObservedObject var layoutStore: LayoutStoreViewModel
+    @Environment(\.createNewLayout) private var createNewLayout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("workspace.editor.layout").font(.headline)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
+                    if let createNewLayout {
+                        newLayoutTile(action: createNewLayout)
+                    }
                     ForEach(layoutStore.layouts) { layout in
                         VStack(spacing: 4) {
                             LayoutThumbnail(layout: layout, size: CGSize(width: 40, height: 26))
@@ -42,5 +46,39 @@ struct LayoutPickerView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    /// Leading "+" tile: opens Settings → Layouts with a fresh layout already
+    /// being edited, so a missing layout can be made without hunting for the
+    /// right tab.
+    private func newLayoutTile(action: @escaping () -> Void) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 40, height: 26)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                        .foregroundStyle(.secondary)
+                )
+            Text("workspace.editor.layout.new").font(.caption2)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .help("layouts.new.help")
+    }
+}
+
+private struct CreateNewLayoutKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    /// Set by `SettingsRoot`: switches to the Layouts tab and starts a new
+    /// layout. `nil` outside the settings window, which hides the "+" tile.
+    var createNewLayout: (() -> Void)? {
+        get { self[CreateNewLayoutKey.self] }
+        set { self[CreateNewLayoutKey.self] = newValue }
     }
 }

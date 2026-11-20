@@ -37,6 +37,7 @@ struct SettingsRoot: View {
     let exportDiagnostics: () async -> Void
 
     @State private var selection: Tab = .workspaces
+    @State private var pendingNewLayout = false
 
     var body: some View {
         NavigationSplitView {
@@ -53,7 +54,7 @@ struct SettingsRoot: View {
                         layoutStore: layoutVM,
                         calendarPermissionRequester: calendarPermissionRequester
                     )
-                case .layouts:     LayoutsTab()
+                case .layouts:     LayoutsTab(pendingNewLayout: $pendingNewLayout)
                 case .hotkeys:     HotkeysTab()
                 case .interaction: InteractionTab(calendarPermissionRequester: calendarPermissionRequester)
                 case .about:       AboutTab(reopenWelcome: reopenWelcome, exportDiagnostics: exportDiagnostics)
@@ -62,6 +63,10 @@ struct SettingsRoot: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding()
             .modifier(DetailTabChrome())
+            .environment(\.createNewLayout, {
+                selection = .layouts
+                pendingNewLayout = true
+            })
         }
     }
 }

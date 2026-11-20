@@ -8,7 +8,7 @@ import CoreGraphics
 ///
 /// Intentionally does NOT return a new `Layout`; callers already have a
 /// `LayoutTemplate` on hand and it's the proportions that vary session-to-
-/// session. Clamping matches `LayoutEditorView`'s slider range `[0.1, 0.9]`
+/// session. Clamping matches the old template editor's slider range `[0.1, 0.9]`
 /// and respects `LayoutTemplate.proportionMinGap` for 3-way splits so the
 /// middle slot never collapses.
 ///

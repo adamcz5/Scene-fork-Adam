@@ -5415,6 +5415,60 @@
         "en": { "stringUnit": { "state": "translated", "value": "Pause all of Scene’s automatic behavior from the menu bar when you need windows to stay exactly where you put them." } }
       }
     },
+    "layouts.new.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New layout" } }
+      }
+    },
+    "workspace.editor.layout.new": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New" } }
+      }
+    },
+    "layouts.editor.presets": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "START FROM A PRESET" } }
+      }
+    },
+    "layouts.editor.snap": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Snap to edges" } }
+      }
+    },
+    "layouts.editor.preview_screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview as" } }
+      }
+    },
+    "layouts.editor.slot_n": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Slot %lld" } }
+      }
+    },
+    "layouts.editor.selected_n": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Slot %lld selected" } }
+      }
+    },
+    "layouts.editor.canvas_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Click a slot to select it, then drag it to move it, or drag its edges and corners to resize. Slots can overlap — the higher the number, the closer to the front." } }
+      }
+    },
+    "layouts.editor.hotkey": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hotkey" } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {

@@ -3,6 +3,10 @@ import SceneCore
 
 struct LayoutsTab: View {
     @EnvironmentObject var layoutVM: LayoutStoreViewModel
+    /// Set by the "+" tile in the Workspace editor's layout picker (via
+    /// `createNewLayout` in the environment): jump here and start a new layout
+    /// straight away instead of just landing on the list.
+    @Binding var pendingNewLayout: Bool
     @State private var selectedID: UUID?
     @State private var errorMessage: String?
 
@@ -29,6 +33,8 @@ struct LayoutsTab: View {
                 .frame(minWidth: 320)
         }
         .toolbar { toolbarContent }
+        .onAppear(perform: startPendingNewLayout)
+        .onChange(of: pendingNewLayout) { _, _ in startPendingNewLayout() }
         .alert("common.error", isPresented: .constant(errorMessage != nil)) {
             Button("common.ok") { errorMessage = nil }
         } message: {
@@ -55,27 +61,7 @@ struct LayoutsTab: View {
             Button {
                 newLayout()
             } label: { Image(systemName: "plus") }
-                .help("layouts.new.template.help")
-
-            // V0.7: a second create-new button that seeds `customTree = .leaf`,
-            // routing the new layout into the canvas editor instead of the
-            // template editor. The sidebar list and everything downstream
-            // (hotkey, store, plan, drag-swap) treats it identically to a
-            // template-based layout — only the EDITOR view differs.
-            Button {
-                newCustomLayout()
-            } label: { Image(systemName: "square.on.square.squareshape.controlhandles") }
-                .help("layouts.new.custom.help")
-
-            // V0.10: a third create-new button that seeds `freeformSlots` with
-            // a single full-bleed slot, routing the new layout into the
-            // overlapping-layout canvas editor. Everything downstream (sidebar
-            // list, hotkey, store, plan, drag-swap) treats it identically to a
-            // template/tree-based layout — only the EDITOR view differs.
-            Button {
-                newFreeformLayout()
-            } label: { Image(systemName: "square.2.layers.3d.top.filled") }
-                .help("layouts.new.freeform.help")
+                .help("layouts.new.help")
 
             Button {
                 deleteSelected()
@@ -100,57 +86,22 @@ struct LayoutsTab: View {
         return layout.isPresetSeed && layout.isModified
     }
 
+    private func startPendingNewLayout() {
+        guard pendingNewLayout else { return }
+        pendingNewLayout = false
+        newLayout()
+    }
+
+    /// Inserts a new layout with a single full-screen slot and opens it in the
+    /// editor, where the preset strip, "Add slot" and the drag handles shape
+    /// it. There is exactly one kind of layout to create — tiled and
+    /// overlapping layouts are the same thing here, just with or without
+    /// overlap. `template` / `slotProportions` are sentinel values that
+    /// `toLayout()` ignores while `freeformSlots` is non-empty.
     private func newLayout() {
         let new = CustomLayout(
             id: UUID(),
             name: String(localized: "layouts.new.default_name"),
-            template: .twoCol,
-            slotProportions: LayoutTemplate.twoCol.defaultProportions,
-            hotkey: nil,
-            isPresetSeed: false,
-            isModified: false
-        )
-        do {
-            try layoutVM.store.insert(new)
-            selectedID = new.id
-        } catch {
-            errorMessage = String(describing: error)
-        }
-    }
-
-    /// V0.7: inserts a new user-authored custom layout with a single-leaf
-    /// tree (full-screen slot). The user immediately sees the canvas editor
-    /// and can click the leaf to split it into their desired shape.
-    /// `template` / `slotProportions` are filled with sentinel values —
-    /// `toLayout()` ignores them while `customTree` is non-nil, and the
-    /// on-disk JSON decodes cleanly on older binaries (which would just
-    /// ignore the unfamiliar `customTree` key).
-    private func newCustomLayout() {
-        let new = CustomLayout(
-            id: UUID(),
-            name: String(localized: "layouts.new.custom.default_name"),
-            template: .single,
-            slotProportions: [],
-            hotkey: nil,
-            isPresetSeed: false,
-            isModified: false,
-            customTree: .leaf
-        )
-        do {
-            try layoutVM.store.insert(new)
-            selectedID = new.id
-        } catch {
-            errorMessage = String(describing: error)
-        }
-    }
-
-    /// V0.10: inserts a new user-authored overlapping layout with a single
-    /// full-bleed slot. The user immediately sees the freeform canvas editor
-    /// and can drag that slot's edges, add more slots, and let them overlap.
-    private func newFreeformLayout() {
-        let new = CustomLayout(
-            id: UUID(),
-            name: String(localized: "layouts.new.freeform.default_name"),
             template: .single,
             slotProportions: [],
             hotkey: nil,
@@ -190,7 +141,7 @@ struct LayoutsTab: View {
 /// bound the editor directly to the store via a computed Binding, so the
 /// Save/Cancel buttons were empty stubs and changes streamed into the store
 /// on every slider tick — fine until `.onChange(of: draft.template)` in
-/// `LayoutEditorView` fired on sidebar selection swap (binding pointed at a
+/// the old template editor fired on sidebar selection swap (binding pointed at a
 /// different layout, so `draft.template` appeared to change) and silently
 /// wrote default proportions back to the destination layout, wiping the
 /// user's customizations. Keeping edits in `@State` breaks that reentry
@@ -219,33 +170,12 @@ private struct LayoutDraftEditor: View {
 
     var body: some View {
         Group {
-            // Branch on which authoring mode this draft uses. Non-empty
-            // `freeformSlots` (V0.10, "+ Overlapping") wins first, then a
-            // non-nil `customTree` (V0.7, "+ Custom"), else template-based —
-            // fall back to the V0.2 editor. Mirrors the precedence in
-            // `CustomLayout.toLayout()`.
-            if !(draft.freeformSlots ?? []).isEmpty {
-                FreeformLayoutCanvasEditor(
-                    draft: $draft,
-                    canSave: hasUnsavedChanges,
-                    onSave: save,
-                    onCancel: { draft = lastSaved }
-                )
-            } else if draft.customTree != nil {
-                CustomLayoutCanvasEditor(
-                    draft: $draft,
-                    canSave: hasUnsavedChanges,
-                    onSave: save,
-                    onCancel: { draft = lastSaved }
-                )
-            } else {
-                LayoutEditorView(
-                    draft: $draft,
-                    canSave: hasUnsavedChanges,
-                    onSave: save,
-                    onCancel: { draft = lastSaved }
-                )
-            }
+            LayoutCanvasEditor(
+                draft: $draft,
+                canSave: hasUnsavedChanges,
+                onSave: save,
+                onCancel: { draft = lastSaved }
+            )
         }
         .alert("common.error", isPresented: .constant(errorMessage != nil)) {
             Button("common.ok") { errorMessage = nil }
