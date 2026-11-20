@@ -9,11 +9,21 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
     public var hotkey: HotkeyBinding?
     public var isPresetSeed: Bool
     public var isModified: Bool
-    /// V0.7 freeform "custom layout build" — when non-nil, `toLayout()` ignores
-    /// `template` / `slotProportions` and flattens this tree into slots. Lets
-    /// users author arbitrary split-based layouts beyond the fixed 11 templates.
-    /// Nil (default) preserves the V0.2 template-based behaviour.
+    /// V0.7 freeform "custom layout build" — when non-nil (and `freeformSlots`
+    /// is nil/empty), `toLayout()` ignores `template` / `slotProportions` and
+    /// flattens this tree into slots. Lets users author arbitrary split-based
+    /// layouts beyond the fixed 11 templates. Nil (default) preserves the
+    /// V0.2 template-based behaviour.
     public var customTree: LayoutNode?
+    /// V0.10 "overlapping layout build" — when non-empty, `toLayout()` uses
+    /// these slots directly (ignoring both `customTree` and `template`/
+    /// `slotProportions`). Unlike `customTree`'s split-tree, each slot's rect
+    /// is independent and slots may overlap — this is how a user builds e.g.
+    /// a Slack strip down the left edge with Chrome sitting on top of it,
+    /// leaving a visible sliver. Array order is the initial z-order (last =
+    /// frontmost); see `FreeformSlot`. Nil/empty (default) preserves prior
+    /// behaviour for every layout created before this field existed.
+    public var freeformSlots: [FreeformSlot]?
     /// V0.9: whether this Layout appears in the Quick Picker's Layouts row.
     /// Defaults to `true` so existing/new Layouts show up without extra setup,
     /// mirroring `Workspace.showInQuickPicker`'s same default-on convention.
@@ -24,12 +34,14 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         slotProportions: [Double], hotkey: HotkeyBinding?,
         isPresetSeed: Bool, isModified: Bool,
         customTree: LayoutNode? = nil,
+        freeformSlots: [FreeformSlot]? = nil,
         showInQuickPicker: Bool = true
     ) {
         self.id = id; self.name = name; self.template = template
         self.slotProportions = slotProportions; self.hotkey = hotkey
         self.isPresetSeed = isPresetSeed; self.isModified = isModified
         self.customTree = customTree
+        self.freeformSlots = freeformSlots
         self.showInQuickPicker = showInQuickPicker
     }
 
@@ -37,11 +49,14 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
     /// only because the engine ignores it; identity for V0.2 routing is `CustomLayout.id` (UUID).
     /// Do not rely on the returned `LayoutID`.
     ///
-    /// V0.7: when `customTree` is present, slots come from its `flatten()` output instead
-    /// of the template. The tree's unit-rect slots pass straight through to
-    /// `LayoutEngine.plan`, which already materializes them via
-    /// `Slot.absoluteRect(in: visibleFrame)` — no engine changes needed.
+    /// Precedence: `freeformSlots` (if non-empty) beats `customTree`, which
+    /// beats the template. All three ultimately produce a flat `[Slot]` —
+    /// `LayoutEngine.plan` has never cared whether those rects overlap, so
+    /// freeform slots pass straight through with no engine changes needed.
     public func toLayout() -> Layout {
+        if let freeform = freeformSlots, !freeform.isEmpty {
+            return Layout(id: .full, name: name, slots: freeform.map(\.slot))
+        }
         if let tree = customTree {
             return Layout(id: .full, name: name, slots: tree.flatten())
         }
@@ -52,11 +67,11 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, template, slotProportions, hotkey,
-             isPresetSeed, isModified, customTree, showInQuickPicker
+             isPresetSeed, isModified, customTree, freeformSlots, showInQuickPicker
     }
 
-    /// Decodes legacy JSON (pre-V0.7) that lacks `customTree`, plus current
-    /// JSON that includes it. Absence of `customTree` → template mode.
+    /// Decodes legacy JSON (pre-V0.7) that lacks `customTree`/`freeformSlots`,
+    /// plus current JSON that includes either. Absence of both → template mode.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(UUID.self, forKey: .id)
@@ -67,6 +82,7 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         self.isPresetSeed = try c.decode(Bool.self, forKey: .isPresetSeed)
         self.isModified = try c.decode(Bool.self, forKey: .isModified)
         self.customTree = try c.decodeIfPresent(LayoutNode.self, forKey: .customTree)
+        self.freeformSlots = try c.decodeIfPresent([FreeformSlot].self, forKey: .freeformSlots)
         self.showInQuickPicker = try c.decodeIfPresent(Bool.self, forKey: .showInQuickPicker) ?? true
     }
 
@@ -80,9 +96,11 @@ public struct CustomLayout: Codable, Equatable, Identifiable, Sendable {
         try c.encode(isPresetSeed, forKey: .isPresetSeed)
         try c.encode(isModified, forKey: .isModified)
         // `encodeIfPresent` so old-style layouts still produce JSON with no
-        // `customTree` key — keeps the on-disk format minimal and lets older
-        // tools / eyes read the file without seeing an unfamiliar nested blob.
+        // `customTree`/`freeformSlots` key — keeps the on-disk format minimal
+        // and lets older tools / eyes read the file without seeing an
+        // unfamiliar nested blob.
         try c.encodeIfPresent(customTree, forKey: .customTree)
+        try c.encodeIfPresent(freeformSlots, forKey: .freeformSlots)
         try c.encode(showInQuickPicker, forKey: .showInQuickPicker)
     }
 }

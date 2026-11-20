@@ -584,13 +584,14 @@ final class Coordinator: ObservableObject {
                       let custom = self.lastAppliedCustomLayout,
                       let screen = self.lastScreen
                 else { return nil }
-                // Tree-based custom layouts (V0.7) carry a stale `template` /
-                // `slotProportions` pair from whatever they were created from;
-                // the tree is the real geometry. Reflowing against that stale
-                // template would push windows to rects of a DIFFERENT layout —
-                // seam reflow is template-only for now, so hand back no context
+                // Tree-based (V0.7) and freeform/overlapping (V0.10) custom
+                // layouts carry a stale `template` / `slotProportions` pair
+                // from whatever they were created from; the tree/slots are
+                // the real geometry. Reflowing against that stale template
+                // would push windows to rects of a DIFFERENT layout — seam
+                // reflow is template-only for now, so hand back no context
                 // and let the user resize freely.
-                guard custom.customTree == nil else { return nil }
+                guard custom.customTree == nil, (custom.freeformSlots ?? []).isEmpty else { return nil }
                 return SeamResizeController.Context(
                     template: custom.template,
                     proportions: custom.slotProportions,

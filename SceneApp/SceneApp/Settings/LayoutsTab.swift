@@ -67,6 +67,16 @@ struct LayoutsTab: View {
             } label: { Image(systemName: "square.on.square.squareshape.controlhandles") }
                 .help("layouts.new.custom.help")
 
+            // V0.10: a third create-new button that seeds `freeformSlots` with
+            // a single full-bleed slot, routing the new layout into the
+            // overlapping-layout canvas editor. Everything downstream (sidebar
+            // list, hotkey, store, plan, drag-swap) treats it identically to a
+            // template/tree-based layout — only the EDITOR view differs.
+            Button {
+                newFreeformLayout()
+            } label: { Image(systemName: "square.2.layers.3d.top.filled") }
+                .help("layouts.new.freeform.help")
+
             Button {
                 deleteSelected()
             } label: { Image(systemName: "trash") }
@@ -134,6 +144,28 @@ struct LayoutsTab: View {
         }
     }
 
+    /// V0.10: inserts a new user-authored overlapping layout with a single
+    /// full-bleed slot. The user immediately sees the freeform canvas editor
+    /// and can drag that slot's edges, add more slots, and let them overlap.
+    private func newFreeformLayout() {
+        let new = CustomLayout(
+            id: UUID(),
+            name: String(localized: "layouts.new.freeform.default_name"),
+            template: .single,
+            slotProportions: [],
+            hotkey: nil,
+            isPresetSeed: false,
+            isModified: false,
+            freeformSlots: [FreeformSlot(rect: CGRect(x: 0, y: 0, width: 1, height: 1))]
+        )
+        do {
+            try layoutVM.store.insert(new)
+            selectedID = new.id
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
     private func deleteSelected() {
         guard let id = selectedID else { return }
         do { try layoutVM.store.delete(id: id); selectedID = nil }
@@ -187,10 +219,19 @@ private struct LayoutDraftEditor: View {
 
     var body: some View {
         Group {
-            // V0.7: branch on `customTree`. A non-nil tree means the user
-            // created this via the "+ Custom" button and wants the canvas
-            // editor. Nil means template-based — fall back to the V0.2 editor.
-            if draft.customTree != nil {
+            // Branch on which authoring mode this draft uses. Non-empty
+            // `freeformSlots` (V0.10, "+ Overlapping") wins first, then a
+            // non-nil `customTree` (V0.7, "+ Custom"), else template-based —
+            // fall back to the V0.2 editor. Mirrors the precedence in
+            // `CustomLayout.toLayout()`.
+            if !(draft.freeformSlots ?? []).isEmpty {
+                FreeformLayoutCanvasEditor(
+                    draft: $draft,
+                    canSave: hasUnsavedChanges,
+                    onSave: save,
+                    onCancel: { draft = lastSaved }
+                )
+            } else if draft.customTree != nil {
                 CustomLayoutCanvasEditor(
                     draft: $draft,
                     canSave: hasUnsavedChanges,

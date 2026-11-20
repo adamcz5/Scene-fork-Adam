@@ -841,6 +841,52 @@
         }
       }
     },
+    "layouts.new.freeform.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add an overlapping layout"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增一個會重疊嘅排列"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增一個會重疊的排列"
+          }
+        }
+      }
+    },
+    "layouts.new.freeform.default_name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlapping Layout"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重疊排列"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重疊排列"
+          }
+        }
+      }
+    },
     "layouts.new.custom.default_name": {
       "extractionState": "manual",
       "localizations": {
@@ -998,6 +1044,121 @@
           "stringUnit": {
             "state": "translated",
             "value": "點選以顯示選項"
+          }
+        }
+      }
+    },
+    "layouts.freeform.slot_count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld slots"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個格"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個格位"
+          }
+        }
+      }
+    },
+    "layouts.freeform.add_slot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add slot"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加多一格"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增一格"
+          }
+        }
+      }
+    },
+    "layouts.freeform.canvas_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag a slot to move it, or its edges to resize independently. Slots can overlap — select one to bring it to front, send it to back, or delete it."
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖曳一格可以郁佢，拖邊框就可以獨立調整大細。格可以重疊 — 揀一格就可以擺上層、擺落底，或者刪除。"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖曳一格即可移動，拖曳邊框可獨立調整大小。格可以重疊 — 選取一格即可移到最上層、移到最後方，或刪除。"
+          }
+        }
+      }
+    },
+    "layouts.freeform.bring_to_front": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring to front"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擺上層"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移到最上層"
+          }
+        }
+      }
+    },
+    "layouts.freeform.send_to_back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to back"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擺落底"
+          }
+        },
+        "zh-TW": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移到最後方"
           }
         }
       }

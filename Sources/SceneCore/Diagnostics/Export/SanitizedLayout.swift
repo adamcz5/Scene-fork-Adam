@@ -9,6 +9,7 @@ public struct SanitizedLayout: Codable, Sendable, Equatable {
     public let isPresetSeed: Bool
     public let isModified: Bool
     public let hasCustomTree: Bool       // boolean only; tree contents redacted
+    public let hasFreeformSlots: Bool    // boolean only; slot geometry redacted
 
     public init(
         id: UUID,
@@ -18,7 +19,8 @@ public struct SanitizedLayout: Codable, Sendable, Equatable {
         hotkey: SanitizedHotkey?,
         isPresetSeed: Bool,
         isModified: Bool,
-        hasCustomTree: Bool
+        hasCustomTree: Bool,
+        hasFreeformSlots: Bool = false
     ) {
         self.id = id
         self.nameHash = nameHash
@@ -28,5 +30,6 @@ public struct SanitizedLayout: Codable, Sendable, Equatable {
         self.isPresetSeed = isPresetSeed
         self.isModified = isModified
         self.hasCustomTree = hasCustomTree
+        self.hasFreeformSlots = hasFreeformSlots
     }
 }

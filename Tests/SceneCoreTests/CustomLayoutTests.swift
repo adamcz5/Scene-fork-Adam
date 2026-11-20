@@ -194,4 +194,78 @@ final class CustomLayoutTests: XCTestCase {
         XCTAssertFalse(json.contains("customTree"),
                        "template-only layouts should not emit a customTree key, got: \(json)")
     }
+
+    // MARK: - Freeform (overlapping) slots
+
+    func testFreeformSlotsTakePrecedenceOverCustomTreeAndTemplate() {
+        let freeform = [
+            FreeformSlot(rect: CGRect(x: 0, y: 0, width: 0.3, height: 1)),
+            FreeformSlot(rect: CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9)),
+        ]
+        let custom = CustomLayout(
+            id: UUID(),
+            name: "Overlapping",
+            template: .twoCol,
+            slotProportions: [0.5],
+            hotkey: nil,
+            isPresetSeed: false,
+            isModified: false,
+            customTree: .leaf,
+            freeformSlots: freeform
+        )
+        let layout = custom.toLayout()
+        XCTAssertEqual(layout.slots.map(\.rect), freeform.map(\.rect))
+    }
+
+    func testEmptyFreeformSlotsFallsBackToCustomTree() {
+        let custom = CustomLayout(
+            id: UUID(),
+            name: "Tree fallback",
+            template: .twoCol,
+            slotProportions: [0.5],
+            hotkey: nil,
+            isPresetSeed: false,
+            isModified: false,
+            customTree: .leaf,
+            freeformSlots: []
+        )
+        XCTAssertEqual(custom.toLayout().slots.count, 1, "empty freeformSlots should fall back to customTree, not win")
+    }
+
+    func testFreeformSlotsCodableRoundTrip() throws {
+        let original = CustomLayout(
+            id: UUID(),
+            name: "Overlapping",
+            template: .single,
+            slotProportions: [],
+            hotkey: nil,
+            isPresetSeed: false,
+            isModified: false,
+            freeformSlots: [
+                FreeformSlot(rect: CGRect(x: 0, y: 0, width: 0.3, height: 1)),
+                FreeformSlot(rect: CGRect(x: 0.05, y: 0, width: 0.95, height: 1)),
+            ]
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testLegacyJSONWithoutFreeformSlotsKeyDecodes() throws {
+        // Pre-V0.10 JSON lacks `freeformSlots` entirely — must decode to nil.
+        let legacyJSON = #"""
+        {
+          "id": "11111111-0001-0000-0000-000000000001",
+          "name": "Halves",
+          "template": "twoCol",
+          "slotProportions": [0.5],
+          "hotkey": null,
+          "isPresetSeed": true,
+          "isModified": false
+        }
+        """#
+        let data = legacyJSON.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(CustomLayout.self, from: data)
+        XCTAssertNil(decoded.freeformSlots)
+    }
 }

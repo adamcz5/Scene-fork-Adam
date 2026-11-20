@@ -19,7 +19,8 @@ public enum ExportSanitizer {
             hotkey: layout.hotkey.map(SanitizedHotkey.init),
             isPresetSeed: layout.isPresetSeed,
             isModified: layout.isModified,
-            hasCustomTree: layout.customTree != nil
+            hasCustomTree: layout.customTree != nil,
+            hasFreeformSlots: !(layout.freeformSlots ?? []).isEmpty
         )
     }
 
