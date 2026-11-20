@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import SceneCore
 
 /// One borderless, click-through, non-activating panel per `NSScreen` that
 /// darkens + blurs the whole screen except the rect(s) punched out of it.
