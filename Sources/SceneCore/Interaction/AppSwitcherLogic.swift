@@ -53,17 +53,18 @@ public enum AppSwitcherLogic {
             .map(\.element)
     }
 
-    /// Index to start the ring at on the first ⌥Tab of a session. If the
-    /// frontmost app is in the ring, starts one step past the FIRST entry
-    /// matching it — so a single tap immediately jumps to a *different* app,
-    /// matching ⌘Tab's "tap once, jump to the last app" feel — otherwise
-    /// starts at the front of the ring.
+    /// Index to start the ring at on the first ⌥Tab of a session. Starts ON
+    /// the frontmost app's entry (if it's in the ring) so the HUD opens with
+    /// the current app highlighted — the user then taps Tab to step away from
+    /// it, rather than the ring pre-advancing to the next app before they've
+    /// pressed anything. Falls back to the front of the ring when the
+    /// frontmost app isn't a configured candidate.
     public static func startIndex(candidates: [AppSwitcherEntry], frontmostBundleID: String?) -> Int {
         guard !candidates.isEmpty else { return 0 }
         guard let frontmostBundleID,
               let idx = candidates.firstIndex(where: { $0.bundleID == frontmostBundleID })
         else { return 0 }
-        return (idx + 1) % candidates.count
+        return idx
     }
 
     /// Advances `index` by one step within a ring of `count` entries, wrapping

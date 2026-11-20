@@ -121,10 +121,10 @@ final class AppSwitcherLogicTests: XCTestCase {
 
     // MARK: - startIndex
 
-    func testStartIndexJumpsPastFrontmostApp() {
+    func testStartIndexStartsOnFrontmostApp() {
         let candidates = ["a", "b", "c"].map { AppSwitcherEntry(bundleID: $0) }
-        XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "a"), 1)
-        XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "c"), 0, "wraps past the last entry")
+        XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "a"), 0)
+        XCTAssertEqual(AppSwitcherLogic.startIndex(candidates: candidates, frontmostBundleID: "c"), 2)
     }
 
     func testStartIndexZeroWhenFrontmostNotInRing() {
