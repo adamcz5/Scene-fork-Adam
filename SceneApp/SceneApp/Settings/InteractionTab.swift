@@ -137,17 +137,10 @@ struct InteractionTab: View {
                 .foregroundStyle(.secondary)
 
             subBlock("interaction.spotlight.subsection.look") {
-                Slider(
-                    value: spotlightBinding(\.darkness),
-                    in: SpotlightConfig.minDarkness...SpotlightConfig.maxDarkness,
-                    step: 0.05
-                ) {
-                    Text("interaction.spotlight.darkness")
-                } minimumValueLabel: {
-                    Text("interaction.spotlight.darkness.min")
-                } maximumValueLabel: {
-                    Text("interaction.spotlight.darkness.max")
-                }
+                uniformSlider("interaction.spotlight.darkness", value: spotlightBinding(\.darkness),
+                              range: SpotlightConfig.minDarkness...SpotlightConfig.maxDarkness, step: 0.05,
+                              minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max",
+                              valueText: String(format: "%.0f%%", settingsVM.spotlight.darkness * 100))
                 .disabled(!settingsVM.spotlight.enabled)
 
                 Picker("interaction.spotlight.blur", selection: spotlightBinding(\.blurPreset)) {
@@ -158,53 +151,19 @@ struct InteractionTab: View {
                 .pickerStyle(.segmented)
                 .disabled(!settingsVM.spotlight.enabled)
 
-                Slider(
-                    value: spotlightBinding(\.speed),
-                    in: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed,
-                    step: 0.1
-                ) {
-                    Text("interaction.spotlight.speed")
-                } minimumValueLabel: {
-                    Text("interaction.spotlight.speed.min")
-                } maximumValueLabel: {
-                    Text("interaction.spotlight.speed.max")
-                }
+                uniformSlider("interaction.spotlight.speed", value: spotlightBinding(\.speed),
+                              range: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed, step: 0.1,
+                              minLabel: "interaction.spotlight.speed.min", maxLabel: "interaction.spotlight.speed.max",
+                              valueText: String(format: "%.1f×", settingsVM.spotlight.speed))
                 .disabled(!settingsVM.spotlight.enabled)
             }
 
             subBlock("interaction.spotlight.subsection.delay", hint: "interaction.spotlight.delay.hint") {
-                Slider(
-                    value: spotlightBinding(\.idleDelaySeconds),
-                    in: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds,
-                    step: 0.5
-                ) {
-                    Text("interaction.spotlight.delay")
-                } minimumValueLabel: {
-                    Text("interaction.spotlight.delay.min")
-                } maximumValueLabel: {
-                    Text("interaction.spotlight.delay.max")
-                }
+                uniformSlider("interaction.spotlight.delay", value: spotlightBinding(\.idleDelaySeconds),
+                              range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 0.5,
+                              minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
+                              valueText: String(format: "%.1fs", settingsVM.spotlight.idleDelaySeconds))
                 .disabled(!settingsVM.spotlight.enabled)
-
-                Text(String(format: String(localized: "interaction.spotlight.delay.value"), settingsVM.spotlight.idleDelaySeconds))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-
-            subBlock("interaction.spotlight.subsection.exceptions", hint: "interaction.spotlight.exceptions.hint") {
-                AppPickerView(
-                    bundleIDs: spotlightBinding(\.exceptionBundleIDs),
-                    label: "interaction.spotlight.exceptions.label"
-                )
-                .disabled(!settingsVM.spotlight.enabled)
-            }
-
-            subBlock("interaction.spotlight.subsection.hotkey", hint: "interaction.spotlight.hotkey.hint") {
-                HotkeyField(
-                    chord: spotlightBinding(\.hotkey),
-                    label: "interaction.spotlight.hotkey",
-                    validate: { validateDimHotkey($0, slot: .dim) }
-                )
             }
 
             subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
@@ -223,14 +182,22 @@ struct InteractionTab: View {
                     .foregroundStyle(.secondary)
 
                 if settingsVM.spotlight.dimBrowserChrome {
-                    uniformSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
-                                  range: 0.35...0.70, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
-                    uniformSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
-                                  range: 0...SpotlightConfig.maxChromeBlurRadius, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
-                    uniformSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
-                                  range: 0.05...0.70, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
-                    uniformSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
-                                  range: 0...20, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                    uniformSlider("interaction.spotlight.chrome.delay", value: spotlightBinding(\.browserChromeDelaySeconds),
+                                  range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 0.5,
+                                  minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
+                                  valueText: String(format: "%.1fs", settingsVM.spotlight.browserChromeDelaySeconds))
+                    uniformSlider("interaction.spotlight.chrome.speed", value: spotlightBinding(\.browserChromeSpeed),
+                                  range: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed, step: 0.1,
+                                  minLabel: "interaction.spotlight.speed.min", maxLabel: "interaction.spotlight.speed.max",
+                                  valueText: String(format: "%.1f×", settingsVM.spotlight.browserChromeSpeed))
+                    levelSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
+                                minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                    levelSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
+                                minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                    levelSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
+                                minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                    levelSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
+                                minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
 
                     Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
                         Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
@@ -262,6 +229,22 @@ struct InteractionTab: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+
+            subBlock("interaction.spotlight.subsection.exceptions", hint: "interaction.spotlight.exceptions.hint") {
+                AppPickerView(
+                    bundleIDs: spotlightBinding(\.exceptionBundleIDs),
+                    label: "interaction.spotlight.exceptions.label"
+                )
+                .disabled(!settingsVM.spotlight.enabled)
+            }
+
+            subBlock("interaction.spotlight.subsection.hotkey", hint: "interaction.spotlight.hotkey.hint") {
+                HotkeyField(
+                    chord: spotlightBinding(\.hotkey),
+                    label: "interaction.spotlight.hotkey",
+                    validate: { validateDimHotkey($0, slot: .dim) }
+                )
             }
 
             Text("interaction.spotlight.hint")
@@ -562,15 +545,17 @@ struct InteractionTab: View {
     /// Read/write binding to one field of `SpotlightConfig`. Edits a COPY of
     /// the current config and saves the whole thing, so every other field —
     /// including ones this view doesn't show — is always carried through.
-    /// A labelled slider whose label and end captions have fixed widths, so every
-    /// slider's track is the same length, and which always has the same number
-    /// of steps (so one notch feels the same on every slider).
+    /// A labelled slider whose label, end captions and value readout have fixed
+    /// widths, so every slider's track is the same length and every one looks
+    /// the same. `step` defaults to 1/20 of the range.
     private func uniformSlider(
         _ label: LocalizedStringKey,
         value: Binding<Double>,
         range: ClosedRange<Double>,
+        step: Double? = nil,
         minLabel: LocalizedStringKey,
-        maxLabel: LocalizedStringKey
+        maxLabel: LocalizedStringKey,
+        valueText: String? = nil
     ) -> some View {
         HStack(spacing: 8) {
             Text(label)
@@ -579,13 +564,30 @@ struct InteractionTab: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .frame(width: 40, alignment: .trailing)
-            Slider(value: value, in: range, step: (range.upperBound - range.lowerBound) / 20)
+            Slider(value: value, in: range, step: step ?? (range.upperBound - range.lowerBound) / 20)
                 .frame(maxWidth: .infinity)
             Text(maxLabel)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .frame(width: 40, alignment: .leading)
+            Text(valueText ?? "")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
         }
+    }
+
+    /// 0-10 level slider used by every top-bar darkness/blur setting, so
+    /// the normal and Lite modes share one scale.
+    private func levelSlider(
+        _ label: LocalizedStringKey,
+        value: Binding<Double>,
+        minLabel: LocalizedStringKey,
+        maxLabel: LocalizedStringKey
+    ) -> some View {
+        uniformSlider(label, value: value, range: 0...SpotlightConfig.maxChromeLevel, step: 1,
+                      minLabel: minLabel, maxLabel: maxLabel, valueText: String(Int(value.wrappedValue.rounded())))
     }
 
     private func spotlightBinding<T>(_ keyPath: WritableKeyPath<SpotlightConfig, T>) -> Binding<T> {

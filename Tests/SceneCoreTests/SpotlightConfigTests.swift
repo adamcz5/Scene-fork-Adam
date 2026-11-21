@@ -19,7 +19,9 @@ final class SpotlightConfigTests: XCTestCase {
         XCTAssertNil(d.browserChromeHotkey)
         XCTAssertEqual(d.exceptionBundleIDs, [])
         XCTAssertFalse(d.browserChromeLight)
-        XCTAssertEqual(d.effectiveChromeDarkness, d.browserChromeDarkness)
+        XCTAssertEqual(d.effectiveChromeDarkness, SpotlightConfig.chromeAlpha(forLevel: d.browserChromeDarkness))
+        XCTAssertEqual(d.browserChromeDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
+        XCTAssertEqual(d.browserChromeSpeed, SpotlightConfig.defaultSpeed)
     }
 
     func testCodableRoundTrip() throws {
@@ -40,11 +42,26 @@ final class SpotlightConfigTests: XCTestCase {
             exceptionBundleIDs: ["com.anthropic.claudefordesktop"],
             browserChromeLight: true,
             browserChromeLightDarkness: 0.3,
-            browserChromeLightBlurRadius: 2
+            browserChromeLightBlurRadius: 2,
+            browserChromeDelaySeconds: 4,
+            browserChromeSpeed: 0.5
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)
         XCTAssertEqual(decoded, original)
+    }
+
+    func testChromeLevelsMapIdenticallyInBothModes() {
+        var c = SpotlightConfig()
+        c.browserChromeDarkness = 5; c.browserChromeLightDarkness = 5
+        c.browserChromeBlurRadius = 5; c.browserChromeLightBlurRadius = 5
+        c.browserChromeLight = false
+        let normal = (c.effectiveChromeDarkness, c.effectiveChromeBlurRadius)
+        c.browserChromeLight = true
+        XCTAssertEqual(c.effectiveChromeDarkness, normal.0)
+        XCTAssertEqual(c.effectiveChromeBlurRadius, normal.1)
+        XCTAssertEqual(SpotlightConfig.chromeAlpha(forLevel: 0), 0)
+        XCTAssertEqual(SpotlightConfig.chromeBlurRadius(forLevel: 10), SpotlightConfig.maxChromeBlurRadius)
     }
 
     func testMissingKeysDecodeToDefaults() throws {

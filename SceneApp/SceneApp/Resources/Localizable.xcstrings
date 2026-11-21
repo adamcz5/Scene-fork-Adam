@@ -5709,6 +5709,18 @@
         "en": { "stringUnit": { "state": "translated", "value": "Lite mode blur" } }
       }
     },
+    "interaction.spotlight.chrome.delay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top bar delay" } }
+      }
+    },
+    "interaction.spotlight.chrome.speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top bar fade speed" } }
+      }
+    },
     "menu.dim.tabs.help": {
       "extractionState": "manual",
       "localizations": {

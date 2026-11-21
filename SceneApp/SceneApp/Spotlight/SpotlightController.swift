@@ -35,6 +35,7 @@ final class SpotlightController {
     /// coordinates). Used to tell whether a newly-focused window is ALREADY
     /// undimmed, in which case focusing it must not dissolve the dim.
     private var shownExclusionFrames: [CGRect] = []
+    private var stripTimer: Timer?
     private var showTimer: Timer?
     /// Browser top-bar dimming layers (one per excluded browser window) and the
     /// pointer poll that hides each while the mouse is over it.
@@ -133,6 +134,8 @@ final class SpotlightController {
     private func stop() {
         showTimer?.invalidate()
         showTimer = nil
+        stripTimer?.invalidate()
+        stripTimer = nil
         teardownAppObserver()
         teardownWindowObserver()
         for overlay in overlays { overlay.hide(immediate: true) }
@@ -320,13 +323,20 @@ final class SpotlightController {
     private func interactionOccurred() {
         showTimer?.invalidate()
         showTimer = nil
+        stripTimer?.invalidate()
+        stripTimer = nil
+        if !stripPanels.isEmpty { hideStrips() }
         if isShown {
             for overlay in overlays { overlay.hide() }
-            hideStrips()
             isShown = false
             shownExclusionFrames = []
         }
         guard config.enabled, permissionGranted else { return }
+        if config.dimBrowserChrome {
+            stripTimer = Timer.scheduledTimer(withTimeInterval: config.browserChromeDelaySeconds, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.showBrowserStrips() }
+            }
+        }
         showTimer = Timer.scheduledTimer(withTimeInterval: config.idleDelaySeconds, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.showSpotlight() }
         }
@@ -345,12 +355,19 @@ final class SpotlightController {
             overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame)
             overlay.show()
         }
-        showStrips(config.dimBrowserChrome ? currentBrowserChromeFrames() : [])
         isShown = true
         shownExclusionFrames = frames
     }
 
     // MARK: - Browser top-bar strips
+
+    /// The top bar has its own delay, so it can come in before or after the
+    /// main dim; it only needs Dim on and a recognized browser in front.
+    private func showBrowserStrips() {
+        stripTimer = nil
+        guard config.enabled, permissionGranted, config.dimBrowserChrome else { return }
+        showStrips(currentBrowserChromeFrames())
+    }
 
     private func showStrips(_ frames: [CGRect]) {
         hideStrips(immediate: true)

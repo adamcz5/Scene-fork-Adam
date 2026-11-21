@@ -73,12 +73,26 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// The top bar is dimmed by its own layer, separate from the main dim, so
     /// it can be darker and less blurred (blurring tabs makes them unreadable
     /// well before they're hidden enough).
+    ///
+    /// Darkness and blur are stored as LEVELS `0...maxChromeLevel` (not raw
+    /// alpha/radius), identical for the normal and the Lite variant; the
+    /// `chromeAlpha(forLevel:)` / `chromeBlurRadius(forLevel:)` helpers turn a
+    /// level into what is actually drawn. Level 0 = no tint / no blur.
     public var browserChromeDarkness: Double
-    /// Blur radius behind the top bar, in points; `0` is no blur. A radius
-    /// rather than the off/light/heavy presets the full-screen dim uses: the
-    /// system's blur materials only come in fixed, strong strengths, far too
-    /// heavy for tabs you still want to half-read.
     public var browserChromeBlurRadius: Double
+    /// Seconds without interaction before the top bar dims (independent of
+    /// the main dim's delay), and the fade speed multiplier for it.
+    public var browserChromeDelaySeconds: Double
+    public var browserChromeSpeed: Double
+    public static let maxChromeLevel: Double = 10
+    public static let chromeAlphaPerLevel: Double = 0.07
+    public static let chromeBlurPerLevel: Double = 4
+    public static func chromeAlpha(forLevel level: Double) -> Double {
+        min(max(level, 0), maxChromeLevel) * chromeAlphaPerLevel
+    }
+    public static func chromeBlurRadius(forLevel level: Double) -> Double {
+        min(max(level, 0), maxChromeLevel) * chromeBlurPerLevel
+    }
     /// Apps (bundle IDs) whose windows are never dimmed, even when they aren't
     /// the frontmost app — e.g. keep a chat window readable while working in
     /// a browser. Chosen manually in Settings.
@@ -88,18 +102,22 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     public var browserChromeLight: Bool
     public var browserChromeLightDarkness: Double
     public var browserChromeLightBlurRadius: Double
-    public static let defaultChromeLightDarkness: Double = 0.4
-    public static let defaultChromeLightBlurRadius: Double = 5
-    /// Darkness / blur actually used for the top bar right now.
-    public var effectiveChromeDarkness: Double { browserChromeLight ? browserChromeLightDarkness : browserChromeDarkness }
-    public var effectiveChromeBlurRadius: Double { browserChromeLight ? browserChromeLightBlurRadius : browserChromeBlurRadius }
+    public static let defaultChromeLightDarkness: Double = 6
+    public static let defaultChromeLightBlurRadius: Double = 1
+    /// Tint opacity / blur radius actually drawn for the top bar right now.
+    public var effectiveChromeDarkness: Double {
+        Self.chromeAlpha(forLevel: browserChromeLight ? browserChromeLightDarkness : browserChromeDarkness)
+    }
+    public var effectiveChromeBlurRadius: Double {
+        Self.chromeBlurRadius(forLevel: browserChromeLight ? browserChromeLightBlurRadius : browserChromeBlurRadius)
+    }
     public static let maxChromeBlurRadius: Double = 40
-    public static let defaultChromeBlurRadius: Double = 3
+    public static let defaultChromeBlurRadius: Double = 5
     /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
     /// which toggles Dim as a whole.
     public var browserChromeHotkey: HotkeyBinding?
 
-    public static let defaultChromeDarkness: Double = 0.55
+    public static let defaultChromeDarkness: Double = 8
     public static let minChromeHeight: Double = 40
     public static let maxChromeHeight: Double = 220
     public static let defaultChromeHeight: Double = 90
@@ -138,7 +156,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         exceptionBundleIDs: [String] = [],
         browserChromeLight: Bool = false,
         browserChromeLightDarkness: Double = SpotlightConfig.defaultChromeLightDarkness,
-        browserChromeLightBlurRadius: Double = SpotlightConfig.defaultChromeLightBlurRadius
+        browserChromeLightBlurRadius: Double = SpotlightConfig.defaultChromeLightBlurRadius,
+        browserChromeDelaySeconds: Double = SpotlightConfig.defaultIdleDelaySeconds,
+        browserChromeSpeed: Double = SpotlightConfig.defaultSpeed
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -157,6 +177,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeLight = browserChromeLight
         self.browserChromeLightDarkness = browserChromeLightDarkness
         self.browserChromeLightBlurRadius = browserChromeLightBlurRadius
+        self.browserChromeDelaySeconds = browserChromeDelaySeconds
+        self.browserChromeSpeed = browserChromeSpeed
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -165,11 +187,16 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         // These two shipped once with defaults (0.6 / light blur) that looked
         // heavier than the main dim; new storage keys make every install pick
         // up the corrected defaults instead of keeping the saved old ones.
-        case browserChromeDarkness = "browserChromeTint"
-        case browserChromeBlurRadius
+        // Darkness/blur switched from raw alpha/radius to 0-10 levels; new keys
+        // so old saved raw values aren't misread as levels.
+        case browserChromeDarkness = "browserChromeDarknessLevel"
+        case browserChromeBlurRadius = "browserChromeBlurLevel"
         case browserChromeHotkey
         case exceptionBundleIDs
-        case browserChromeLight, browserChromeLightDarkness, browserChromeLightBlurRadius
+        case browserChromeLight
+        case browserChromeLightDarkness = "browserChromeLiteDarknessLevel"
+        case browserChromeLightBlurRadius = "browserChromeLiteBlurLevel"
+        case browserChromeDelaySeconds, browserChromeSpeed
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -196,6 +223,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeLight = try c.decodeIfPresent(Bool.self, forKey: .browserChromeLight) ?? false
         self.browserChromeLightDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeLightDarkness) ?? Self.defaultChromeLightDarkness
         self.browserChromeLightBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeLightBlurRadius) ?? Self.defaultChromeLightBlurRadius
+        self.browserChromeDelaySeconds = try c.decodeIfPresent(Double.self, forKey: .browserChromeDelaySeconds) ?? Self.defaultIdleDelaySeconds
+        self.browserChromeSpeed = try c.decodeIfPresent(Double.self, forKey: .browserChromeSpeed) ?? Self.defaultSpeed
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -217,5 +246,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeLight, forKey: .browserChromeLight)
         try c.encode(browserChromeLightDarkness, forKey: .browserChromeLightDarkness)
         try c.encode(browserChromeLightBlurRadius, forKey: .browserChromeLightBlurRadius)
+        try c.encode(browserChromeDelaySeconds, forKey: .browserChromeDelaySeconds)
+        try c.encode(browserChromeSpeed, forKey: .browserChromeSpeed)
     }
 }
