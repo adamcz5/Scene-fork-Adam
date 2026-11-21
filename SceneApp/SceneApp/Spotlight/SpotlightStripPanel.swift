@@ -17,19 +17,15 @@ final class SpotlightStripPanel: NSPanel {
     private static let baseShowDuration: TimeInterval = 0.35
     private static let baseHideDuration: TimeInterval = 0.15
     private static let hoverDuration: TimeInterval = 0.12
-    /// After the pointer leaves, the bar stays clear this long before the dim
-    /// returns, then takes `returnDuration` to fade back in.
-    private static let returnDelay: TimeInterval = 1.5
-    private static let returnDuration: TimeInterval = 0.5
 
     private let tintView = NSView()
     private var speed: Double = SpotlightConfig.defaultSpeed
-    /// When set, the fade-in uses this speed instead of the top bar's own
-    /// (the first dim after a switch fades in together with the main dim).
-    var fadeSpeedOverride: Double?
     private var blurRadius: Int = 0
     private var hovered = false
     private var returnTimer: Timer?
+    /// After the pointer leaves, the bar stays clear for the top bar's own
+    /// Fade delay, then fades back at its own Fade speed (both from Settings).
+    private var returnDelay: TimeInterval = SpotlightConfig.defaultIdleDelaySeconds
     private var shown = false
 
     init(frame: CGRect) {
@@ -63,17 +59,18 @@ final class SpotlightStripPanel: NSPanel {
 
     func apply(config: SpotlightConfig) {
         speed = min(max(config.browserChromeSpeed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
+        returnDelay = max(config.browserChromeDelaySeconds, 0)
         let darkness = min(max(config.effectiveChromeDarkness, 0), 1)
         tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(darkness).cgColor
         blurRadius = Int(min(max(config.effectiveChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius).rounded())
         if shown && !hovered { applyBlur() }
     }
 
-    func show() {
+    func show(quick: Bool = false) {
         shown = true
         orderFrontRegardless()
         if !hovered { applyBlur() }
-        animate(to: hovered ? 0 : 1, duration: Self.baseShowDuration / (fadeSpeedOverride.map { min(max($0, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed) } ?? speed), timing: .easeOut)
+        animate(to: hovered ? 0 : 1, duration: quick ? Self.baseHideDuration : Self.baseShowDuration / speed, timing: .easeOut)
     }
 
     /// Fades out and orders out; `immediate` skips the fade.
@@ -116,7 +113,7 @@ final class SpotlightStripPanel: NSPanel {
         } else {
             // Pointer left: keep the bar clear for a moment before dimming again.
             guard hovered, returnTimer == nil else { return }
-            returnTimer = Timer.scheduledTimer(withTimeInterval: Self.returnDelay, repeats: false) { [weak self] _ in
+            returnTimer = Timer.scheduledTimer(withTimeInterval: returnDelay, repeats: false) { [weak self] _ in
                 Task { @MainActor in self?.finishHover() }
             }
         }
@@ -127,7 +124,7 @@ final class SpotlightStripPanel: NSPanel {
         hovered = false
         guard shown else { return }
         applyBlur()
-        animate(to: 1, duration: Self.returnDuration, timing: .easeInEaseOut)
+        animate(to: 1, duration: Self.baseShowDuration / speed, timing: .easeInEaseOut)
     }
 
     private func applyBlur() {

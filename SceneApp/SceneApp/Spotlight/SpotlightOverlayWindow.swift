@@ -98,7 +98,7 @@ final class SpotlightOverlayWindow: NSPanel {
     /// window's own local coordinates (origin at this screen's bottom-left),
     /// which — since neither `blurView`/`tintView` override `isFlipped` —
     /// needs only a translation, no vertical flip.
-    func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect) {
+    func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect, animated: Bool = false) {
         let merged = RectMerging.mergingOverlapping(excludedFrames)
         let path = CGMutablePath()
         path.addRect(CGRect(origin: .zero, size: screenFrame.size))
@@ -113,10 +113,18 @@ final class SpotlightOverlayWindow: NSPanel {
             )
             path.addRect(local)
         }
-        blurMask.path = path
-        blurMask.fillRule = .evenOdd
-        tintMask.path = path
-        tintMask.fillRule = .evenOdd
+        for mask in [blurMask, tintMask] {
+            if animated, let old = mask.path {
+                let anim = CABasicAnimation(keyPath: "path")
+                anim.fromValue = old
+                anim.toValue = path
+                anim.duration = Self.baseHideAnimationDuration
+                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                mask.add(anim, forKey: "holeMove")
+            }
+            mask.path = path
+            mask.fillRule = .evenOdd
+        }
     }
 
     func show() {

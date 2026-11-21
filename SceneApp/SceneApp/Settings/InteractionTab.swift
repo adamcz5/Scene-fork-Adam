@@ -177,13 +177,13 @@ struct InteractionTab: View {
             }
 
             uniformSlider("interaction.spotlight.delay", value: spotlightBinding(\.idleDelaySeconds),
-                          range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 1,
+                          range: 0...10, step: 0.5,
                           minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
                           valueText: String(format: "%.1fs", dim.idleDelaySeconds))
             uniformSlider("interaction.spotlight.speed", value: fadeSecondsBinding(\.speed),
-                          range: 0.5...5, step: 0.5,
+                          range: 0...10, step: 0.5,
                           minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
-                          valueText: String(format: "%.1fs", SpotlightConfig.fadeBaseSeconds / max(dim.speed, 0.01)))
+                          valueText: String(format: "%.1fs", ((SpotlightConfig.fadeBaseSeconds / max(dim.speed, 0.01)) * 2).rounded() / 2))
 
             Divider()
 
@@ -234,13 +234,13 @@ struct InteractionTab: View {
                 levelSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
                             minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
                 uniformSlider("interaction.spotlight.chrome.delay", value: spotlightBinding(\.browserChromeDelaySeconds),
-                              range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 1,
+                              range: 0...10, step: 0.5,
                               minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
                               valueText: String(format: "%.1fs", dim.browserChromeDelaySeconds))
                 uniformSlider("interaction.spotlight.chrome.speed", value: fadeSecondsBinding(\.browserChromeSpeed),
-                              range: 0.5...5, step: 0.5,
+                              range: 0...10, step: 0.5,
                               minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
-                              valueText: String(format: "%.1fs", SpotlightConfig.fadeBaseSeconds / max(dim.browserChromeSpeed, 0.01)))
+                              valueText: String(format: "%.1fs", ((SpotlightConfig.fadeBaseSeconds / max(dim.browserChromeSpeed, 0.01)) * 2).rounded() / 2))
             }
             .disabled(off)
 
@@ -641,7 +641,7 @@ struct InteractionTab: View {
             get: { SpotlightConfig.fadeBaseSeconds / max(settingsVM.spotlight[keyPath: keyPath], 0.01) },
             set: { seconds in
                 var config = settingsVM.spotlight
-                config[keyPath: keyPath] = SpotlightConfig.fadeBaseSeconds / max(seconds, 0.05)
+                config[keyPath: keyPath] = SpotlightConfig.fadeBaseSeconds / max(seconds, SpotlightConfig.fadeBaseSeconds / SpotlightConfig.maxSpeed)
                 try? settingsVM.store.setSpotlight(config)
             }
         )

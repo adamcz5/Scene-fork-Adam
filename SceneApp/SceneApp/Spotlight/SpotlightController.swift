@@ -100,9 +100,9 @@ final class SpotlightController {
         config = newConfig
         for overlay in overlays { overlay.apply(config: newConfig) }
         for panel in stripPanels { panel.apply(config: newConfig) }
-        if shouldRun, wasRunning, isShown, Self.onlyTabBarSwitchChanged(from: oldConfig, to: newConfig) {
-            // Tab-bar dimming switched on/off (or Lite toggled) while the rest
-            // is already dimmed: just the top bar changes, on its own timing.
+        if shouldRun, wasRunning, Self.onlyTabBarSwitchChanged(from: oldConfig, to: newConfig) {
+            // Tab-bar dimming switched on/off (or Lite toggled): only the top
+            // bar changes, on its own delay and speed; the rest is untouched.
             stripTimer?.invalidate()
             stripTimer = nil
             if !newConfig.dimBrowserChrome {
@@ -276,9 +276,31 @@ final class SpotlightController {
         }
 
         if isShown, isAlreadyUndimmed(windowElement: element) {
+            refreshShownDim()
             return
         }
         interactionOccurred()
+    }
+
+    /// Focus moved to a window that is already bright: keep the dim, but glide
+    /// the holes (and the top-bar strip) to the new target over the same short
+    /// fade as an un-dim instead of leaving them stale or jumping.
+    private func refreshShownDim() {
+        var frames = currentExclusionFrames()
+        guard !frames.isEmpty else { return }
+        frames += exceptionAppFrames()
+        for overlay in overlays {
+            overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame, animated: true)
+        }
+        shownExclusionFrames = frames
+        if config.dimBrowserChrome {
+            let chrome = currentBrowserChromeFrames()
+            let changed = chrome.count != stripFrames.count || zip(chrome, stripFrames).contains { $0 != $1 }
+            if changed {
+                hideStrips()
+                showStrips(chrome, quick: true)
+            }
+        }
     }
 
     /// Whether `windowElement` currently sits inside a hole of the SHOWN
@@ -352,6 +374,13 @@ final class SpotlightController {
             shownExclusionFrames = []
         }
         guard config.enabled, permissionGranted else { return }
+        // The top bar runs on its own delay (and its own fade speed), fully
+        // independent of the apps/background dim.
+        if config.dimBrowserChrome {
+            stripTimer = Timer.scheduledTimer(withTimeInterval: config.browserChromeDelaySeconds, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.showBrowserStrips() }
+            }
+        }
         showTimer = Timer.scheduledTimer(withTimeInterval: config.idleDelaySeconds, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.showSpotlight() }
         }
@@ -370,11 +399,6 @@ final class SpotlightController {
             overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame)
             overlay.show()
         }
-        // First dim after everything was clear: the top bar comes in at the
-        // same moment and with the same fade as the rest.
-        if config.dimBrowserChrome {
-            showStrips(currentBrowserChromeFrames(), mainTiming: true)
-        }
         isShown = true
         shownExclusionFrames = frames
     }
@@ -386,21 +410,20 @@ final class SpotlightController {
     private func showBrowserStrips() {
         stripTimer = nil
         guard config.enabled, permissionGranted, config.dimBrowserChrome else { return }
-        showStrips(currentBrowserChromeFrames(), mainTiming: false)
+        showStrips(currentBrowserChromeFrames())
     }
 
-    private func showStrips(_ frames: [CGRect], mainTiming: Bool) {
+    private func showStrips(_ frames: [CGRect], quick: Bool = false) {
         hideStrips(immediate: true)
         guard !frames.isEmpty else { return }
         stripFrames = frames
         stripPanels = frames.map { frame in
             let panel = SpotlightStripPanel(frame: frame)
             panel.apply(config: config)
-            panel.fadeSpeedOverride = mainTiming ? config.speed : nil
             // Already hovering when the dim arrives: start faded out instead
             // of flashing in for a poll tick.
             panel.setHovered(frame.contains(NSEvent.mouseLocation))
-            panel.show()
+            panel.show(quick: quick)
             return panel
         }
         let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in

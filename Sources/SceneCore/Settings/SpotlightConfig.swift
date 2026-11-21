@@ -131,8 +131,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     public static let maxDarkness: Double = 0.9
     public static let defaultDarkness: Double = 0.45
 
-    public static let minSpeed: Double = 0.05
-    public static let maxSpeed: Double = 3.5
+    public static let minSpeed: Double = 0.03
+    public static let maxSpeed: Double = 7
     public static let defaultSpeed: Double = 1
     /// Fade-in length in seconds at `speed == 1`; Settings shows the fade as
     /// seconds (`fadeBaseSeconds / speed`).
