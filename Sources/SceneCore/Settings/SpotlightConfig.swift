@@ -85,6 +85,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// the main dim's delay), and the fade speed multiplier for it.
     public var browserChromeDelaySeconds: Double
     public var browserChromeSpeed: Double
+    /// Soft edges, as levels 0...10 (x4 points): how far the dim ramps up around
+    /// the active window (`edgeSoftness`) and below the browser top bar
+    /// (`browserChromeEdgeSoftness`). 0 = hard edge.
+    public var edgeSoftness: Double
+    public var browserChromeEdgeSoftness: Double
+    public static let defaultEdgeSoftness: Double = 3
+    public static let defaultChromeEdgeSoftness: Double = 4
     public static let maxChromeLevel: Double = 10
     public static let chromeAlphaPerLevel: Double = 0.07
     public static let chromeBlurPerLevel: Double = 4
@@ -162,7 +169,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         browserChromeLightDarkness: Double = SpotlightConfig.defaultChromeLightDarkness,
         browserChromeLightBlurRadius: Double = SpotlightConfig.defaultChromeLightBlurRadius,
         browserChromeDelaySeconds: Double = SpotlightConfig.defaultIdleDelaySeconds,
-        browserChromeSpeed: Double = SpotlightConfig.defaultSpeed
+        browserChromeSpeed: Double = SpotlightConfig.defaultSpeed,
+        edgeSoftness: Double = SpotlightConfig.defaultEdgeSoftness,
+        browserChromeEdgeSoftness: Double = SpotlightConfig.defaultChromeEdgeSoftness
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -183,6 +192,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeLightBlurRadius = browserChromeLightBlurRadius
         self.browserChromeDelaySeconds = browserChromeDelaySeconds
         self.browserChromeSpeed = browserChromeSpeed
+        self.edgeSoftness = edgeSoftness
+        self.browserChromeEdgeSoftness = browserChromeEdgeSoftness
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -201,6 +212,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         case browserChromeLightDarkness = "browserChromeLiteDarknessLevel"
         case browserChromeLightBlurRadius = "browserChromeLiteBlurLevel"
         case browserChromeDelaySeconds, browserChromeSpeed
+        case edgeSoftness, browserChromeEdgeSoftness
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -229,6 +241,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeLightBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeLightBlurRadius) ?? Self.defaultChromeLightBlurRadius
         self.browserChromeDelaySeconds = try c.decodeIfPresent(Double.self, forKey: .browserChromeDelaySeconds) ?? Self.defaultIdleDelaySeconds
         self.browserChromeSpeed = try c.decodeIfPresent(Double.self, forKey: .browserChromeSpeed) ?? Self.defaultSpeed
+        self.edgeSoftness = try c.decodeIfPresent(Double.self, forKey: .edgeSoftness) ?? Self.defaultEdgeSoftness
+        self.browserChromeEdgeSoftness = try c.decodeIfPresent(Double.self, forKey: .browserChromeEdgeSoftness) ?? Self.defaultChromeEdgeSoftness
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -252,5 +266,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeLightBlurRadius, forKey: .browserChromeLightBlurRadius)
         try c.encode(browserChromeDelaySeconds, forKey: .browserChromeDelaySeconds)
         try c.encode(browserChromeSpeed, forKey: .browserChromeSpeed)
+        try c.encode(edgeSoftness, forKey: .edgeSoftness)
+        try c.encode(browserChromeEdgeSoftness, forKey: .browserChromeEdgeSoftness)
     }
 }

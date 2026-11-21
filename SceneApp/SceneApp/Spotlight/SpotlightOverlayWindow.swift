@@ -5,37 +5,49 @@ import SceneCore
 /// One borderless, click-through, non-activating panel per `NSScreen` that
 /// darkens + blurs the whole screen except the rect(s) punched out of it.
 ///
-/// Look (darkness, blur preset, fade speed) comes from `SpotlightConfig` via
-/// `apply(config:)`.
+/// Darkening comes from tint views (black at `config.darkness`); blurring from
+/// `NSVisualEffectView`s in `.behindWindow` mode. Each gets its own
+/// `CAShapeLayer` even-odd mask. Overlapping hole rects are pre-merged via
+/// `RectMerging.mergingOverlapping`.
 ///
-/// Darkening comes from `tintView` (plain black at `config.darkness`
-/// opacity); blurring comes from `blurView`, an `NSVisualEffectView` in
-/// `.behindWindow` blending mode, which samples and blurs whatever is
-/// actually on screen underneath this window. Both get their own
-/// `CAShapeLayer` mask (same path, kept in sync) rather than one shared mask
-/// on a wrapping container — that avoids relying on whether a mask set on an
-/// ancestor layer correctly propagates through `NSVisualEffectView`'s
-/// internal backdrop-filter layer.
+/// Soft edges: with edge softness > 0 the overlay is built from several stacked
+/// tint/blur layers whose holes are progressively larger, so the dim ramps up
+/// over a few points around each hole instead of cutting off sharply. Each
+/// layer carries a share of the total opacity so the stack adds up to the
+/// chosen darkness / blur.
 ///
-/// `updateHoles(excludedFrames:)` merges its rects via
-/// `RectMerging.mergingOverlapping` — see that type's doc comment for why
-/// overlapping holes must be pre-merged before cutting an even-odd mask.
+/// Darkness and blur changes can be applied live (`apply(config:animated:)`),
+/// gliding from the current look to the new one instead of restarting the dim.
 final class SpotlightOverlayWindow: NSPanel {
     /// Fade durations at `speed == 1`; actual duration is `base / speed`.
     static let baseShowAnimationDuration: TimeInterval = 0.35
     static let baseHideAnimationDuration: TimeInterval = 0.15
+    private static let liveChangeDuration: TimeInterval = 0.3
+    private static let featherSteps = 5
+    static let edgePointsPerLevel: CGFloat = 4
 
     private var speed: Double = SpotlightConfig.defaultSpeed
     private var showAnimationDuration: TimeInterval { Self.baseShowAnimationDuration / speed }
     /// Un-dimming is always the same quick fade, independent of the fade-speed setting.
     private var hideAnimationDuration: TimeInterval { Self.baseHideAnimationDuration }
 
-    private let blurView = NSVisualEffectView()
-    private let tintView = NSView()
-    private let blurMask = CAShapeLayer()
-    private let tintMask = CAShapeLayer()
+    private final class Stage {
+        let blur = NSVisualEffectView()
+        let tint = NSView()
+        let blurMask = CAShapeLayer()
+        let tintMask = CAShapeLayer()
+    }
+
+    private let container: NSView
+    private var stages: [Stage] = []
+    private var darkness: Double = SpotlightConfig.defaultDarkness
+    private var blurAlpha: Double = 1
+    private var featherPoints: CGFloat = 0
+    private var lastFrames: [CGRect] = []
+    private var lastScreenFrame: CGRect = .zero
 
     init(screen: NSScreen) {
+        container = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
         super.init(
             contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -54,76 +66,146 @@ final class SpotlightOverlayWindow: NSPanel {
         ignoresMouseEvents = true
         isMovableByWindowBackground = false
         // `.stationary` keeps Mission Control / Exposé from treating this as
-        // a real window tile; scoped to the space it was created on (no
-        // `.canJoinAllSpaces`) — Spotlight is deliberately windowed-desktop
-        // only, not a full-screen-Space feature.
+        // a real window tile; scoped to the space it was created on.
         collectionBehavior = [.stationary, .ignoresCycle]
         alphaValue = 0
 
-        blurView.material = .hudWindow
-        blurView.blendingMode = .behindWindow
-        blurView.state = .active
-        blurView.wantsLayer = true
-        blurView.layer?.mask = blurMask
-
-        tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(SpotlightConfig.defaultDarkness).cgColor
-        tintView.layer?.mask = tintMask
-
-        let container = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        blurView.frame = container.bounds
-        blurView.autoresizingMask = [.width, .height]
-        tintView.frame = container.bounds
-        tintView.autoresizingMask = [.width, .height]
-        container.addSubview(blurView)
-        container.addSubview(tintView)
         self.contentView = container
-
+        rebuildStages(count: 1)
         setFrame(screen.frame, display: false)
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Pushes the user-tunable look into the views. Safe to call while shown —
-    /// it only changes layer/material properties, not visibility.
-    func apply(config: SpotlightConfig) {
+    private func rebuildStages(count: Int) {
+        for stage in stages {
+            stage.blur.removeFromSuperview()
+            stage.tint.removeFromSuperview()
+        }
+        stages = (0..<count).map { _ in
+            let stage = Stage()
+            stage.blur.material = .hudWindow
+            stage.blur.blendingMode = .behindWindow
+            stage.blur.state = .active
+            stage.blur.wantsLayer = true
+            stage.blur.layer?.mask = stage.blurMask
+            stage.tint.wantsLayer = true
+            stage.tint.layer?.mask = stage.tintMask
+            for view in [stage.blur, stage.tint] {
+                view.frame = container.bounds
+                view.autoresizingMask = [.width, .height]
+            }
+            return stage
+        }
+        // blur layers first, tint layers on top
+        for stage in stages { container.addSubview(stage.blur) }
+        for stage in stages { container.addSubview(stage.tint) }
+        applyLook(animated: false)
+        if !lastFrames.isEmpty || lastScreenFrame != .zero {
+            updateHoles(excludedFrames: lastFrames, screenFrame: lastScreenFrame, animated: false)
+        }
+    }
+
+    /// Share each of `count` stacked layers must carry so the stack composes to
+    /// `total` opacity: 1 - (1 - b)^count = total.
+    private func share(of total: Double) -> Double {
+        let t = min(max(total, 0), 1)
+        return 1 - pow(1 - t, 1.0 / Double(max(stages.count, 1)))
+    }
+
+    private func applyLook(animated: Bool) {
+        let tintAlpha = share(of: darkness)
+        let blurShare = share(of: blurAlpha)
+        for stage in stages {
+            let newColor = NSColor.black.withAlphaComponent(tintAlpha).cgColor
+            if animated, let layer = stage.tint.layer {
+                let from = layer.presentation()?.backgroundColor ?? layer.backgroundColor
+                let anim = CABasicAnimation(keyPath: "backgroundColor")
+                anim.fromValue = from
+                anim.toValue = newColor
+                anim.duration = Self.liveChangeDuration
+                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                layer.add(anim, forKey: "liveTint")
+                layer.backgroundColor = newColor
+            } else {
+                stage.tint.layer?.backgroundColor = newColor
+            }
+            stage.blur.isHidden = false
+            if animated {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = Self.liveChangeDuration
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    stage.blur.animator().alphaValue = blurShare
+                }
+            } else {
+                stage.blur.alphaValue = blurShare
+            }
+        }
+    }
+
+    /// Pushes the user-tunable look into the views. Safe to call while shown.
+    /// `animated` glides darkness/blur/softness from where they are now.
+    func apply(config: SpotlightConfig, animated: Bool = false) {
         speed = min(max(config.speed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
-        SpotlightLook.apply(blurView: blurView, tintView: tintView, darkness: config.darkness, blur: config.blurPreset)
+        darkness = min(max(config.darkness, 0), 1)
+        switch config.blurPreset {
+        case .off: blurAlpha = 0
+        case .light: blurAlpha = 0.25
+        case .medium: blurAlpha = 0.55
+        case .heavy: blurAlpha = 1
+        }
+        let newFeather = CGFloat(min(max(config.edgeSoftness, 0), SpotlightConfig.maxChromeLevel)) * Self.edgePointsPerLevel
+        let newCount = newFeather > 0 ? Self.featherSteps : 1
+        let featherChanged = newFeather != featherPoints
+        featherPoints = newFeather
+        if newCount != stages.count {
+            rebuildStages(count: newCount)
+        } else {
+            applyLook(animated: animated)
+            if featherChanged, !lastFrames.isEmpty || lastScreenFrame != .zero {
+                updateHoles(excludedFrames: lastFrames, screenFrame: lastScreenFrame, animated: animated)
+            }
+        }
     }
 
     /// `excludedFrames` are in the global NS screen-coordinate system
-    /// (bottom-left origin, matching `NSScreen.frame`) — same convention as
-    /// `AXWindow.frame` everywhere else in this codebase. Converts to this
-    /// window's own local coordinates (origin at this screen's bottom-left),
-    /// which — since neither `blurView`/`tintView` override `isFlipped` —
-    /// needs only a translation, no vertical flip.
+    /// (bottom-left origin, matching `NSScreen.frame`). Converts to this
+    /// window's own local coordinates (origin at this screen's bottom-left).
     func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect, animated: Bool = false) {
-        let merged = RectMerging.mergingOverlapping(excludedFrames)
-        let path = CGMutablePath()
-        path.addRect(CGRect(origin: .zero, size: screenFrame.size))
-        for frame in merged {
-            let clipped = frame.intersection(screenFrame)
-            guard !clipped.isEmpty else { continue }
-            let local = CGRect(
-                x: clipped.minX - screenFrame.minX,
-                y: clipped.minY - screenFrame.minY,
-                width: clipped.width,
-                height: clipped.height
-            )
-            path.addRect(local)
-        }
-        for mask in [blurMask, tintMask] {
-            if animated, let old = mask.path {
-                let anim = CABasicAnimation(keyPath: "path")
-                anim.fromValue = old
-                anim.toValue = path
-                anim.duration = Self.baseHideAnimationDuration
-                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                mask.add(anim, forKey: "holeMove")
+        lastFrames = excludedFrames
+        lastScreenFrame = screenFrame
+        let count = stages.count
+        for (index, stage) in stages.enumerated() {
+            // Layer 0 has the biggest hole, the last layer the smallest, so the
+            // number of layers dimming a point grows with distance from the hole.
+            let grow = count > 1 ? featherPoints * CGFloat(count - index) / CGFloat(count) : 0
+            let expanded = excludedFrames.map { $0.insetBy(dx: -grow, dy: -grow) }
+            let merged = RectMerging.mergingOverlapping(expanded)
+            let path = CGMutablePath()
+            path.addRect(CGRect(origin: .zero, size: screenFrame.size))
+            for frame in merged {
+                let clipped = frame.intersection(screenFrame)
+                guard !clipped.isEmpty else { continue }
+                path.addRect(CGRect(
+                    x: clipped.minX - screenFrame.minX,
+                    y: clipped.minY - screenFrame.minY,
+                    width: clipped.width,
+                    height: clipped.height
+                ))
             }
-            mask.path = path
-            mask.fillRule = .evenOdd
+            for mask in [stage.blurMask, stage.tintMask] {
+                if animated, let old = mask.path {
+                    let anim = CABasicAnimation(keyPath: "path")
+                    anim.fromValue = old
+                    anim.toValue = path
+                    anim.duration = Self.baseHideAnimationDuration
+                    anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    mask.add(anim, forKey: "holeMove")
+                }
+                mask.path = path
+                mask.fillRule = .evenOdd
+            }
         }
     }
 
@@ -158,31 +240,5 @@ final class SpotlightOverlayWindow: NSPanel {
             guard let self, self.alphaValue == 0 else { return }
             self.orderOut(nil)
         })
-    }
-}
-
-/// Maps the user's darkness + blur-preset choices onto a blur/tint view pair.
-/// Shared by the full-screen overlay and the browser top-bar panel, which have
-/// independent settings but identical machinery.
-enum SpotlightLook {
-    static func apply(blurView: NSVisualEffectView, tintView: NSView, darkness: Double, blur: SpotlightBlurPreset) {
-        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(min(max(darkness, 0), 1)).cgColor
-        // The system blur materials all blur about equally hard, so the weaker
-        // levels fade the blur view itself: a partial-opacity blur is a mix of
-        // sharp and blurred, i.e. a gentler blur.
-        blurView.material = .hudWindow
-        switch blur {
-        case .off:
-            blurView.isHidden = true
-        case .light:
-            blurView.isHidden = false
-            blurView.alphaValue = 0.25
-        case .medium:
-            blurView.isHidden = false
-            blurView.alphaValue = 0.55
-        case .heavy:
-            blurView.isHidden = false
-            blurView.alphaValue = 1
-        }
     }
 }

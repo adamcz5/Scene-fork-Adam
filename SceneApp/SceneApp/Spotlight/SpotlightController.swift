@@ -98,9 +98,14 @@ final class SpotlightController {
         let wasRunning = config.enabled && permissionGranted
         let oldConfig = config
         config = newConfig
-        for overlay in overlays { overlay.apply(config: newConfig) }
-        for panel in stripPanels { panel.apply(config: newConfig) }
-        if shouldRun, wasRunning, Self.onlyTabBarSwitchChanged(from: oldConfig, to: newConfig) {
+        // Darkness / blur / softness changes glide from the current look to the
+        // new one and leave the dim running; everything else restarts it.
+        let lookOnly = shouldRun && wasRunning && Self.onlyLookChanged(from: oldConfig, to: newConfig)
+        let tabSwitch = shouldRun && wasRunning && Self.onlyTabBarSwitchChanged(from: oldConfig, to: newConfig)
+        for overlay in overlays { overlay.apply(config: newConfig, animated: lookOnly) }
+        for panel in stripPanels { panel.apply(config: newConfig, animated: lookOnly || tabSwitch) }
+        if lookOnly { return }
+        if tabSwitch {
             // Tab-bar dimming switched on/off (or Lite toggled): only the top
             // bar changes, on its own delay and speed; the rest is untouched.
             stripTimer?.invalidate()
@@ -122,6 +127,19 @@ final class SpotlightController {
             // idle period rather than mid-display with stale settings.
             interactionOccurred()
         }
+    }
+
+    private static func onlyLookChanged(from old: SpotlightConfig, to new: SpotlightConfig) -> Bool {
+        var probe = old
+        probe.darkness = new.darkness
+        probe.blurPreset = new.blurPreset
+        probe.edgeSoftness = new.edgeSoftness
+        probe.browserChromeDarkness = new.browserChromeDarkness
+        probe.browserChromeBlurRadius = new.browserChromeBlurRadius
+        probe.browserChromeLightDarkness = new.browserChromeLightDarkness
+        probe.browserChromeLightBlurRadius = new.browserChromeLightBlurRadius
+        probe.browserChromeEdgeSoftness = new.browserChromeEdgeSoftness
+        return probe == new && probe != old
     }
 
     private static func onlyTabBarSwitchChanged(from old: SpotlightConfig, to new: SpotlightConfig) -> Bool {
@@ -418,7 +436,10 @@ final class SpotlightController {
         guard !frames.isEmpty else { return }
         stripFrames = frames
         stripPanels = frames.map { frame in
-            let panel = SpotlightStripPanel(frame: frame)
+            let panel = SpotlightStripPanel(
+                frame: frame,
+                feather: CGFloat(min(max(config.browserChromeEdgeSoftness, 0), SpotlightConfig.maxChromeLevel)) * SpotlightStripPanel.edgePointsPerLevel
+            )
             panel.apply(config: config)
             // Already hovering when the dim arrives: start faded out instead
             // of flashing in for a poll tick.

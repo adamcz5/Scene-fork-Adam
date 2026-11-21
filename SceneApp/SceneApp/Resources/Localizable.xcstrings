@@ -5787,6 +5787,24 @@
         "en": { "stringUnit": { "state": "translated", "value": "Medium" } }
       }
     },
+    "interaction.spotlight.edge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edge softness" } }
+      }
+    },
+    "interaction.spotlight.edge.min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sharp" } }
+      }
+    },
+    "interaction.spotlight.edge.max": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Soft" } }
+      }
+    },
     "menu.dim.tabs.help": {
       "extractionState": "manual",
       "localizations": {
