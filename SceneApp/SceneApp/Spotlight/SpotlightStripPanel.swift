@@ -186,9 +186,11 @@ final class SpotlightStripPanel: NSPanel {
         shown = true
         orderFrontRegardless()
         let fade = quick ? Self.baseHideDuration : Self.baseShowDuration / speed
-        // The blur isn't part of the window's opacity fade, so it is ramped by
-        // hand over the same time and with the same ease-in/ease-out curve.
-        if !isBand, !hovered { glideBlur(from: 0, duration: fade) }
+        // The blur radius is set once, at its final value, and the window's own
+        // opacity fade brings it in together with the tint. No per-frame blur
+        // updates: the radius only takes whole numbers, so ramping it by hand
+        // made a small blur arrive in a few visible jumps.
+        if !isBand, !hovered { setBlur(targetBlur) }
         animate(to: hovered ? 0 : 1, duration: fade, timing: .easeInEaseOut)
         for band in bands { band.show(quick: quick) }
     }
@@ -249,7 +251,7 @@ final class SpotlightStripPanel: NSPanel {
         hovered = false
         guard shown else { return }
         let fade = Self.baseShowDuration / speed
-        if !isBand { glideBlur(from: 0, duration: fade) }
+        if !isBand { setBlur(targetBlur) }
         animate(to: 1, duration: fade, timing: .easeInEaseOut)
     }
 
