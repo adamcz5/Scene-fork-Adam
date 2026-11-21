@@ -116,27 +116,41 @@ final class SpotlightStripPanel: NSPanel {
     /// darkness (same blur), easing in smoothly, so the bar blends into a dark,
     /// blurred background. The middle stays at constant darkness.
     private static let sideShadeFraction: CGFloat = 0.03
-    private static let sideShadeAlpha: CGFloat = 0.3
+    /// At the very edge the bar is this much darker than the middle, in
+    /// proportion (1.3 = 30% darker), so it tracks the darkness slider.
+    private static let sideShadeRatio: CGFloat = 1.3
+    private static let sideShadeCap: CGFloat = 0.95
+    private var sideShade: CAGradientLayer?
+    private static let sideShadeFactors: [CGFloat] = [1, 0.74, 0.26, 0, 0, 0.26, 0.74, 1]
 
     private func addSideShading(to view: NSView) {
-        let edge = Self.sideShadeAlpha
         let width = Self.sideShadeFraction
-        func shade(_ factor: CGFloat) -> CGColor { NSColor.black.withAlphaComponent(edge * factor).cgColor }
         let gradient = CAGradientLayer()
         gradient.frame = view.bounds
         gradient.startPoint = CGPoint(x: 0, y: 0.5)
         gradient.endPoint = CGPoint(x: 1, y: 0.5)
-        // Smoothstep ramp at each end (1 -> 0.74 -> 0.26 -> 0), flat in between.
-        let factors: [CGFloat] = [1, 0.74, 0.26, 0, 0, 0.26, 0.74, 1]
-        var colors: [CGColor] = []
-        for factor in factors { colors.append(shade(factor)) }
-        gradient.colors = colors
         let third: CGFloat = width / 3
         let stops: [CGFloat] = [0, third, third * 2, width, 1 - width, 1 - third * 2, 1 - third, 1]
         var locations: [NSNumber] = []
         for stop in stops { locations.append(NSNumber(value: Double(stop))) }
         gradient.locations = locations
         view.layer?.addSublayer(gradient)
+        sideShade = gradient
+        updateSideShade(darkness: SpotlightConfig.defaultChromeDarkness * SpotlightConfig.chromeAlphaPerLevel)
+    }
+
+    /// Extra black on top of the bar's tint so the total at the edge is
+    /// `darkness * ratio` (capped): d + e(1 - d) = target  =>  e = (target - d) / (1 - d).
+    private func updateSideShade(darkness: Double) {
+        guard let sideShade else { return }
+        let d = CGFloat(min(max(darkness, 0), 1))
+        let target = min(d * Self.sideShadeRatio, Self.sideShadeCap)
+        let extra: CGFloat = (d < 1 && target > d) ? (target - d) / (1 - d) : 0
+        var colors: [CGColor] = []
+        for factor in Self.sideShadeFactors {
+            colors.append(NSColor.black.withAlphaComponent(extra * factor).cgColor)
+        }
+        sideShade.colors = colors
     }
 
     private var midScale: Double { Double(topScale + bottomScale) / 2 }
@@ -145,6 +159,7 @@ final class SpotlightStripPanel: NSPanel {
         speed = min(max(config.browserChromeSpeed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
         returnDelay = max(config.browserChromeDelaySeconds, 0)
         let darkness = min(max(config.effectiveChromeDarkness, 0), 1)
+        updateSideShade(darkness: darkness)
         let color = NSColor.black.withAlphaComponent(darkness).cgColor
         if animated, let layer = tintView.layer {
             let anim = CABasicAnimation(keyPath: "backgroundColor")
