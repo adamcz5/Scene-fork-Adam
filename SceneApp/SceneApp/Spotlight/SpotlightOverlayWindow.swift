@@ -151,9 +151,9 @@ final class SpotlightOverlayWindow: NSPanel {
         darkness = min(max(config.darkness, 0), 1)
         switch config.blurPreset {
         case .off: blurAlpha = 0
-        case .light: blurAlpha = 0.25
-        case .medium: blurAlpha = 0.55
-        case .heavy: blurAlpha = 1
+        case .light: blurAlpha = 0.32
+        case .medium: blurAlpha = 0.72
+        case .heavy: blurAlpha = 0.9
         }
         let newFeather = CGFloat(min(max(config.edgeSoftness, 0), SpotlightConfig.maxChromeLevel)) * Self.edgePointsPerLevel
         let newCount = newFeather > 0 ? Self.featherSteps : 1
