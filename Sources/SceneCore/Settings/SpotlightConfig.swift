@@ -75,8 +75,11 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// well before they're hidden enough).
     public var browserChromeDarkness: Double
     public var browserChromeBlur: SpotlightBlurPreset
+    /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
+    /// which toggles Dim as a whole.
+    public var browserChromeHotkey: HotkeyBinding?
 
-    public static let defaultChromeDarkness: Double = 0.6
+    public static let defaultChromeDarkness: Double = 0.55
     public static let minChromeHeight: Double = 40
     public static let maxChromeHeight: Double = 220
     public static let defaultChromeHeight: Double = 90
@@ -110,7 +113,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         browserChromeMode: SpotlightChromeMode = .automatic,
         browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight,
         browserChromeDarkness: Double = SpotlightConfig.defaultChromeDarkness,
-        browserChromeBlur: SpotlightBlurPreset = .light
+        browserChromeBlur: SpotlightBlurPreset = .off,
+        browserChromeHotkey: HotkeyBinding? = nil
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -124,11 +128,18 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeHeight = browserChromeHeight
         self.browserChromeDarkness = browserChromeDarkness
         self.browserChromeBlur = browserChromeBlur
+        self.browserChromeHotkey = browserChromeHotkey
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabled, exclusionMode, idleDelaySeconds, darkness, blurPreset, speed, hotkey, dimBrowserChrome
-        case browserChromeMode, browserChromeHeight, browserChromeDarkness, browserChromeBlur
+        case browserChromeMode, browserChromeHeight
+        // These two shipped once with defaults (0.6 / light blur) that looked
+        // heavier than the main dim; new storage keys make every install pick
+        // up the corrected defaults instead of keeping the saved old ones.
+        case browserChromeDarkness = "browserChromeTint"
+        case browserChromeBlur = "browserChromeBlurLevel"
+        case browserChromeHotkey
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -149,7 +160,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeMode = try c.decodeIfPresent(SpotlightChromeMode.self, forKey: .browserChromeMode) ?? .automatic
         self.browserChromeHeight = try c.decodeIfPresent(Double.self, forKey: .browserChromeHeight) ?? Self.defaultChromeHeight
         self.browserChromeDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeDarkness) ?? Self.defaultChromeDarkness
-        self.browserChromeBlur = try c.decodeIfPresent(SpotlightBlurPreset.self, forKey: .browserChromeBlur) ?? .light
+        self.browserChromeBlur = try c.decodeIfPresent(SpotlightBlurPreset.self, forKey: .browserChromeBlur) ?? .off
+        self.browserChromeHotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .browserChromeHotkey)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -166,5 +178,6 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeHeight, forKey: .browserChromeHeight)
         try c.encode(browserChromeDarkness, forKey: .browserChromeDarkness)
         try c.encode(browserChromeBlur, forKey: .browserChromeBlur)
+        try c.encodeIfPresent(browserChromeHotkey, forKey: .browserChromeHotkey)
     }
 }

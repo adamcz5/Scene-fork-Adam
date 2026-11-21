@@ -44,9 +44,17 @@ struct HotkeysTab: View {
                 HotkeyField(
                     chord: dimHotkeyBinding,
                     label: "interaction.spotlight.hotkey",
-                    validate: validateDimHotkey
+                    validate: { validateDimHotkey($0, other: settingsVM.spotlight.browserChromeHotkey, otherName: "interaction.spotlight.chrome_hotkey") }
                 )
                 Text("interaction.spotlight.hotkey.hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HotkeyField(
+                    chord: chromeHotkeyBinding,
+                    label: "interaction.spotlight.chrome_hotkey",
+                    validate: { validateDimHotkey($0, other: settingsVM.spotlight.hotkey, otherName: "interaction.spotlight.hotkey") }
+                )
+                Text("interaction.spotlight.chrome_hotkey.hint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -113,9 +121,20 @@ struct HotkeysTab: View {
         )
     }
 
+    private var chromeHotkeyBinding: Binding<HotkeyBinding?> {
+        Binding(
+            get: { settingsVM.spotlight.browserChromeHotkey },
+            set: { value in
+                var config = settingsVM.spotlight
+                config.browserChromeHotkey = value
+                try? settingsVM.store.setSpotlight(config)
+            }
+        )
+    }
+
     /// Same cross-check as the Quick Picker: refuse a chord already bound to a
-    /// layout, a workspace, or the Quick Picker.
-    private func validateDimHotkey(_ binding: HotkeyBinding) -> String? {
+    /// layout, a workspace, the Quick Picker, or the other Dim hotkey.
+    private func validateDimHotkey(_ binding: HotkeyBinding, other: HotkeyBinding?, otherName: String.LocalizationValue) -> String? {
         let format = String(localized: "hotkeys.conflict")
         if let layout = layoutVM.layouts.first(where: { $0.hotkey == binding }) {
             return String(format: format, layout.name)
@@ -125,6 +144,9 @@ struct HotkeysTab: View {
         }
         if settingsVM.quickPickerHotkey == binding {
             return String(format: format, String(localized: "hotkeys.quick_picker.label"))
+        }
+        if other == binding {
+            return String(format: format, String(localized: otherName))
         }
         return nil
     }

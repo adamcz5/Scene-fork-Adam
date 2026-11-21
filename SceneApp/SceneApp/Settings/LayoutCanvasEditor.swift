@@ -593,6 +593,9 @@ struct LayoutCanvasEditor: View {
         if settingsVM.spotlight.hotkey == binding {
             return String(format: format, String(localized: "interaction.spotlight.hotkey"))
         }
+        if settingsVM.spotlight.browserChromeHotkey == binding {
+            return String(format: format, String(localized: "interaction.spotlight.chrome_hotkey"))
+        }
         return nil
     }
 

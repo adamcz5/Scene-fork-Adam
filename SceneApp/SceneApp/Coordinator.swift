@@ -544,6 +544,24 @@ final class Coordinator: ObservableObject {
                 }
             )
         }
+        if let binding = settingsStore.spotlight.browserChromeHotkey, claim(binding) {
+            hotkeyManager.register(
+                uuid: Self.toggleBrowserChromeHotkeyUUID,
+                keyCode: binding.keyCode,
+                modifiers: binding.carbonModifiers,
+                handler: { [weak self] in
+                    Task { @MainActor in self?.toggleBrowserChromeDimming() }
+                }
+            )
+        }
+    }
+
+    /// Flips just the browser top-bar dimming, leaving Dim itself and every
+    /// other setting as they were.
+    private func toggleBrowserChromeDimming() {
+        var config = settingsStore.spotlight
+        config.dimBrowserChrome.toggle()
+        try? settingsStore.setSpotlight(config)
     }
 
     /// Flips Spotlight (dim) on/off, leaving every other setting — including
@@ -563,6 +581,9 @@ final class Coordinator: ObservableObject {
 
     /// Synthetic identifier for the Spotlight toggle hotkey, same reasoning as above.
     private static let toggleSpotlightHotkeyUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+    /// Synthetic identifier for the browser top-bar dimming toggle hotkey.
+    private static let toggleBrowserChromeHotkeyUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
 
     // MARK: - Drag-to-swap lifecycle
 

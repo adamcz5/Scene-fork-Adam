@@ -5601,6 +5601,24 @@
         "en": { "stringUnit": { "state": "translated", "value": "Top bar blur" } }
       }
     },
+    "interaction.spotlight.chrome_hotkey": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Toggle top bar" } }
+      }
+    },
+    "interaction.spotlight.chrome_hotkey.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turns just the browser tab-bar dimming on or off, leaving the rest of Dim as it is." } }
+      }
+    },
+    "menu.dim.browser_tabs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim browser tabs" } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {

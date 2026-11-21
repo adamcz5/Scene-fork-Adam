@@ -195,7 +195,7 @@ struct InteractionTab: View {
                 HotkeyField(
                     chord: spotlightBinding(\.hotkey),
                     label: "interaction.spotlight.hotkey",
-                    validate: validateSpotlightHotkey
+                    validate: { validateDimHotkey($0, slot: .dim) }
                 )
             }
 
@@ -204,6 +204,15 @@ struct InteractionTab: View {
                 // settings, and always editable (it only takes effect while
                 // Dim is on).
                 Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightBinding(\.dimBrowserChrome))
+
+                HotkeyField(
+                    chord: spotlightBinding(\.browserChromeHotkey),
+                    label: "interaction.spotlight.chrome_hotkey",
+                    validate: { validateDimHotkey($0, slot: .browserChrome) }
+                )
+                Text("interaction.spotlight.chrome_hotkey.hint")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
 
                 if settingsVM.spotlight.dimBrowserChrome {
                     Slider(
@@ -585,9 +594,12 @@ struct InteractionTab: View {
         )
     }
 
-    /// Refuses a chord already bound to a layout, a workspace, or the Quick
-    /// Picker — otherwise the later registration would silently lose.
-    private func validateSpotlightHotkey(_ binding: HotkeyBinding) -> String? {
+    private enum DimHotkeySlot { case dim, browserChrome }
+
+    /// Refuses a chord already bound to a layout, a workspace, the Quick
+    /// Picker, or the OTHER Dim hotkey — otherwise the later registration
+    /// would silently lose.
+    private func validateDimHotkey(_ binding: HotkeyBinding, slot: DimHotkeySlot) -> String? {
         let format = String(localized: "hotkeys.conflict")
         if let layout = layoutVM.layouts.first(where: { $0.hotkey == binding }) {
             return String(format: format, layout.name)
@@ -598,7 +610,14 @@ struct InteractionTab: View {
         if settingsVM.quickPickerHotkey == binding {
             return String(format: format, String(localized: "hotkeys.quick_picker.label"))
         }
-        return nil
+        switch slot {
+        case .dim where settingsVM.spotlight.browserChromeHotkey == binding:
+            return String(format: format, String(localized: "interaction.spotlight.chrome_hotkey"))
+        case .browserChrome where settingsVM.spotlight.hotkey == binding:
+            return String(format: format, String(localized: "interaction.spotlight.hotkey"))
+        default:
+            return nil
+        }
     }
 
     private func label(for curve: EasingCurve) -> String {

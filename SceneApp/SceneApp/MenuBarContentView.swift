@@ -235,9 +235,12 @@ struct MenuBarContentView: View {
     /// globally). Per-monitor stays clickable while Dim is off so the choice
     /// is already made when Dim is turned back on.
     private var dimTilesRow: some View {
-        HStack(spacing: 6) {
-            dimTile("menu.dim.enable", systemImage: "moon.fill", isOn: settingsVM.spotlight.enabled, action: toggleDimEnabled)
-            dimTile("menu.dim.per_monitor", systemImage: "rectangle.on.rectangle", isOn: settingsVM.spotlight.exclusionMode == .perMonitor, action: toggleDimPerMonitor)
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                dimTile("menu.dim.enable", systemImage: "moon.fill", isOn: settingsVM.spotlight.enabled, action: toggleDimEnabled)
+                dimTile("menu.dim.per_monitor", systemImage: "rectangle.on.rectangle", isOn: settingsVM.spotlight.exclusionMode == .perMonitor, action: toggleDimPerMonitor)
+            }
+            dimTile("menu.dim.browser_tabs", systemImage: "macwindow", isOn: settingsVM.spotlight.dimBrowserChrome, action: toggleDimBrowserTabs)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
@@ -282,6 +285,12 @@ struct MenuBarContentView: View {
     private func toggleDimEnabled() {
         var config = settingsVM.spotlight
         config.enabled.toggle()
+        try? settingsVM.store.setSpotlight(config)
+    }
+
+    private func toggleDimBrowserTabs() {
+        var config = settingsVM.spotlight
+        config.dimBrowserChrome.toggle()
         try? settingsVM.store.setSpotlight(config)
     }
 
