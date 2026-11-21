@@ -104,12 +104,40 @@ final class SpotlightStripPanel: NSPanel {
             gradient.endPoint = CGPoint(x: 0.5, y: 0)
             tintView.layer?.mask = gradient
         }
+        if !isBand { addSideShading(to: tintView) }
         contentView = tintView
         setFrame(frame, display: false)
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// The outermost few percent on the left and right edges get a little extra
+    /// darkness (same blur), easing in smoothly, so the bar blends into a dark,
+    /// blurred background. The middle stays at constant darkness.
+    private static let sideShadeFraction: CGFloat = 0.03
+    private static let sideShadeAlpha: CGFloat = 0.3
+
+    private func addSideShading(to view: NSView) {
+        let edge = Self.sideShadeAlpha
+        let width = Self.sideShadeFraction
+        func shade(_ factor: CGFloat) -> CGColor { NSColor.black.withAlphaComponent(edge * factor).cgColor }
+        let gradient = CAGradientLayer()
+        gradient.frame = view.bounds
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        // Smoothstep ramp at each end (1 -> 0.74 -> 0.26 -> 0), flat in between.
+        let factors: [CGFloat] = [1, 0.74, 0.26, 0, 0, 0.26, 0.74, 1]
+        var colors: [CGColor] = []
+        for factor in factors { colors.append(shade(factor)) }
+        gradient.colors = colors
+        let third: CGFloat = width / 3
+        let stops: [CGFloat] = [0, third, third * 2, width, 1 - width, 1 - third * 2, 1 - third, 1]
+        var locations: [NSNumber] = []
+        for stop in stops { locations.append(NSNumber(value: Double(stop))) }
+        gradient.locations = locations
+        view.layer?.addSublayer(gradient)
+    }
 
     private var midScale: Double { Double(topScale + bottomScale) / 2 }
 
