@@ -31,8 +31,6 @@ struct InteractionTab: View {
                 dragSwapCard
                 appSwitcherCard
                 spotlightCard
-                tabBarCard
-                excludedAppsCard
                 workspaceTriggersCard
             }
             .padding(24)
@@ -126,27 +124,38 @@ struct InteractionTab: View {
         }
     }
 
-    /// Dim card: the two tiles (same as the menu bar), the shortcut, and the
-    /// look/timing sliders — one unified block.
+    /// One big "Focus Mode (Dimming)" block holding two separate sections:
+    /// Apps Dimming and Browser Tab Bar Dimming.
     private var spotlightCard: some View {
+        card("interaction.spotlight.section") {
+            appsDimmingSection
+            tabBarSection
+        }
+    }
+
+    private var appsDimmingSection: some View {
         let dim = settingsVM.spotlight
-        return card("interaction.spotlight.section", hint: "interaction.spotlight.section.hint") {
+        return sectionBox("interaction.apps.section") {
             HStack(spacing: 8) {
                 DimTileButton(
                     title: dim.enabled ? "menu.dim.on" : "menu.dim.off",
                     systemImage: "moon.fill", isOn: dim.enabled, help: "menu.dim.help",
                     action: { var c = settingsVM.spotlight; c.enabled.toggle(); try? settingsVM.store.setSpotlight(c) }
                 )
+                // Stays highlighted whenever Dim is on, whichever mode is chosen.
                 DimTileButton(
                     title: dim.exclusionMode == .perMonitor ? "menu.dim.mode.local" : "menu.dim.mode.global",
-                    systemImage: "rectangle.on.rectangle", isOn: dim.exclusionMode == .perMonitor, help: "menu.dim.mode.help",
+                    systemImage: "rectangle.on.rectangle", isOn: dim.enabled, help: "menu.dim.mode.help",
                     action: { var c = settingsVM.spotlight; c.exclusionMode = c.exclusionMode == .single ? .perMonitor : .single; try? settingsVM.store.setSpotlight(c) }
                 )
             }
+            Text(dim.exclusionMode == .perMonitor ? "menu.dim.mode.local.detail" : "menu.dim.mode.global.detail")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
 
             HotkeyField(
                 chord: spotlightBinding(\.hotkey),
-                label: "interaction.spotlight.hotkey",
+                label: "interaction.apps.shortcut",
                 validate: { validateDimHotkey($0, slot: .dim) }
             )
 
@@ -174,6 +183,14 @@ struct InteractionTab: View {
                           range: 0.5...5, step: 0.5,
                           minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
                           valueText: String(format: "%.1fs", SpotlightConfig.fadeBaseSeconds / max(dim.speed, 0.01)))
+
+            Divider()
+
+            AppPickerView(
+                bundleIDs: spotlightBinding(\.exceptionBundleIDs),
+                label: "interaction.spotlight.exceptions.label",
+                compact: true
+            )
         }
     }
 
@@ -186,13 +203,11 @@ struct InteractionTab: View {
         try? settingsVM.store.setSpotlight(c)
     }
 
-    /// Browser tab bar card: On / Lite / Off tiles, shortcut, sliders, and the
-    /// (smaller) detection settings.
-    private var tabBarCard: some View {
+    private var tabBarSection: some View {
         let dim = settingsVM.spotlight
         let current: TabBarState = !dim.dimBrowserChrome ? .off : (dim.browserChromeLight ? .lite : .on)
         let off = current == .off
-        return card("interaction.chrome.section") {
+        return sectionBox("interaction.chrome.section") {
             HStack(spacing: 8) {
                 DimTileButton(title: "interaction.chrome.state.on", systemImage: "macwindow", isOn: current == .on,
                               help: "menu.dim.tabs.help", action: { setTabBarState(.on) })
@@ -204,7 +219,7 @@ struct InteractionTab: View {
 
             HotkeyField(
                 chord: spotlightBinding(\.browserChromeHotkey),
-                label: "interaction.spotlight.chrome_hotkey",
+                label: "interaction.chrome.shortcut",
                 validate: { validateDimHotkey($0, slot: .browserChrome) }
             )
 
@@ -228,48 +243,56 @@ struct InteractionTab: View {
             }
             .disabled(off)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
+            Divider()
+
+            HStack(spacing: 8) {
+                Text("interaction.spotlight.chrome.mode").frame(width: 150, alignment: .leading)
+                Picker("", selection: spotlightBinding(\.browserChromeMode)) {
                     Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
                     Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
-
-                if dim.browserChromeMode == .fixedHeight {
-                    uniformSlider("interaction.spotlight.chrome.height", value: spotlightBinding(\.browserChromeHeight),
-                                  range: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight, step: 18,
-                                  minLabel: "interaction.spotlight.chrome.height.min", maxLabel: "interaction.spotlight.chrome.height.max",
-                                  valueText: String(Int(dim.browserChromeHeight)))
-                }
-
-                HStack(spacing: 8) {
-                    Button("interaction.spotlight.chrome.test") { runChromeTest() }
-                        .controlSize(.small)
-                        .disabled(isTestingChrome)
-                    if isTestingChrome { ProgressView().controlSize(.small) }
-                }
-                if let chromeTestResult {
-                    Text(chromeTestResult)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text("interaction.spotlight.dim_browser_chrome.hint")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                .frame(width: 220)
+                Button("interaction.spotlight.chrome.test") { runChromeTest() }
+                    .controlSize(.small)
+                    .disabled(isTestingChrome)
+                if isTestingChrome { ProgressView().controlSize(.small) }
+                Spacer()
             }
+
+            if dim.browserChromeMode == .fixedHeight {
+                uniformSlider("interaction.spotlight.chrome.height", value: spotlightBinding(\.browserChromeHeight),
+                              range: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight, step: 18,
+                              minLabel: "interaction.spotlight.chrome.height.min", maxLabel: "interaction.spotlight.chrome.height.max",
+                              valueText: String(Int(dim.browserChromeHeight)))
+            }
+            if let chromeTestResult {
+                Text(chromeTestResult)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("interaction.spotlight.dim_browser_chrome.hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
-    /// Small card listing apps that stay bright while everything else dims.
-    private var excludedAppsCard: some View {
-        card("interaction.excluded.section", compact: true) {
-            AppPickerView(
-                bundleIDs: spotlightBinding(\.exceptionBundleIDs),
-                label: "interaction.spotlight.exceptions.label",
-                showsLabel: false
-            )
+    /// A titled section box (second-level heading) inside a bigger card.
+    @ViewBuilder
+    private func sectionBox<Content: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
     }
 
     /// Reports what automatic detection finds in each open supported browser.
@@ -409,7 +432,7 @@ struct InteractionTab: View {
         VStack(alignment: .leading, spacing: compact ? 8 : 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(compact ? .subheadline : .title3)
+                    .font(compact ? .subheadline : .title2)
                     .bold()
                 if let hint {
                     Text(hint)

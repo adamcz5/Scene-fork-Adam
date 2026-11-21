@@ -248,7 +248,7 @@ struct MenuBarContentView: View {
                 dimTile(
                     dim.exclusionMode == .perMonitor ? "menu.dim.mode.local" : "menu.dim.mode.global",
                     systemImage: "rectangle.on.rectangle",
-                    isOn: dim.exclusionMode == .perMonitor,
+                    isOn: dim.enabled,
                     help: "menu.dim.mode.help",
                     action: toggleDimPerMonitor
                 )

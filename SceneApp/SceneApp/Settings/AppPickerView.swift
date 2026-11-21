@@ -15,16 +15,18 @@ struct AppPickerView: View {
     @Binding var bundleIDs: [String]
     let label: LocalizedStringKey
     var showsLabel: Bool = true
+    var compact: Bool = false
     @State private var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if showsLabel { Text(label).font(.headline) }
             HStack {
+                if showsLabel { Text(label).font(compact ? .caption.bold() : .headline) }
                 Spacer()
                 Button("workspace.editor.apps.add") {
                     addViaPanel()
                 }
+                .controlSize(compact ? .small : .regular)
             }
             List {
                 ForEach(bundleIDs, id: \.self) { id in
@@ -49,7 +51,9 @@ struct AppPickerView: View {
                     }
                 }
             }
-            .frame(minHeight: 80, maxHeight: 140)
+            .scrollContentBackground(compact ? .hidden : .automatic)
+            .background(compact ? Color.primary.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+            .frame(minHeight: compact ? 36 : 80, maxHeight: compact ? 84 : 140)
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 handleDrop(providers: providers)
             }

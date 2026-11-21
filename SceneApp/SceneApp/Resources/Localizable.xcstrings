@@ -5316,7 +5316,7 @@
     "interaction.spotlight.exceptions.label": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Excluded apps" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Dimming excluded apps" } }
       }
     },
     "interaction.triggers.section": {
@@ -5670,13 +5670,13 @@
     "menu.dim.mode.local": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Local" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Per Monitor" } }
       }
     },
     "menu.dim.mode.help": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Global: one window stays clear across all displays. Local: one window stays clear on each display." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Global: all but one app across monitors is dimmed. Per Monitor: one app per monitor stays visible." } }
       }
     },
     "menu.dim.tabs.on": {
@@ -5749,6 +5749,36 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Dimming excluded apps" } }
+      }
+    },
+    "interaction.apps.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apps Dimming" } }
+      }
+    },
+    "interaction.apps.shortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apps Dim Shortcut" } }
+      }
+    },
+    "interaction.chrome.shortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tab Bar Dim Shortcut" } }
+      }
+    },
+    "menu.dim.mode.global.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Global: all but one app across monitors is dimmed." } }
+      }
+    },
+    "menu.dim.mode.local.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Per Monitor: one app per monitor stays visible." } }
       }
     },
     "menu.dim.tabs.help": {
