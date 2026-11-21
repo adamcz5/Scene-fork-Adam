@@ -22,7 +22,6 @@ final class SpotlightConfigTests: XCTestCase {
         XCTAssertEqual(d.effectiveChromeDarkness, SpotlightConfig.chromeAlpha(forLevel: d.browserChromeDarkness))
         XCTAssertEqual(d.browserChromeDelaySeconds, SpotlightConfig.defaultIdleDelaySeconds)
         XCTAssertEqual(d.browserChromeSpeed, SpotlightConfig.defaultSpeed)
-        XCTAssertEqual(d.edgeSoftness, SpotlightConfig.defaultEdgeSoftness)
     }
 
     func testCodableRoundTrip() throws {
@@ -45,9 +44,7 @@ final class SpotlightConfigTests: XCTestCase {
             browserChromeLightDarkness: 0.3,
             browserChromeLightBlurRadius: 2,
             browserChromeDelaySeconds: 4,
-            browserChromeSpeed: 0.5,
-            edgeSoftness: 6,
-            browserChromeEdgeSoftness: 2
+            browserChromeSpeed: 0.5
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)

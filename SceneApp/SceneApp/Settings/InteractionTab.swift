@@ -176,9 +176,6 @@ struct InteractionTab: View {
                 .pickerStyle(.segmented)
             }
 
-            levelSlider("interaction.spotlight.edge", value: spotlightBinding(\.edgeSoftness),
-                        minLabel: "interaction.spotlight.edge.min", maxLabel: "interaction.spotlight.edge.max")
-
             uniformSlider("interaction.spotlight.delay", value: spotlightBinding(\.idleDelaySeconds),
                           range: 0...10, step: 0.5,
                           minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
@@ -236,8 +233,6 @@ struct InteractionTab: View {
                             minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
                 levelSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
                             minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
-                levelSlider("interaction.spotlight.edge", value: spotlightBinding(\.browserChromeEdgeSoftness),
-                            minLabel: "interaction.spotlight.edge.min", maxLabel: "interaction.spotlight.edge.max")
                 uniformSlider("interaction.spotlight.chrome.delay", value: spotlightBinding(\.browserChromeDelaySeconds),
                               range: 0...10, step: 0.5,
                               minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",

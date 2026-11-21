@@ -133,12 +133,10 @@ final class SpotlightController {
         var probe = old
         probe.darkness = new.darkness
         probe.blurPreset = new.blurPreset
-        probe.edgeSoftness = new.edgeSoftness
         probe.browserChromeDarkness = new.browserChromeDarkness
         probe.browserChromeBlurRadius = new.browserChromeBlurRadius
         probe.browserChromeLightDarkness = new.browserChromeLightDarkness
         probe.browserChromeLightBlurRadius = new.browserChromeLightBlurRadius
-        probe.browserChromeEdgeSoftness = new.browserChromeEdgeSoftness
         return probe == new && probe != old
     }
 
@@ -436,10 +434,7 @@ final class SpotlightController {
         guard !frames.isEmpty else { return }
         stripFrames = frames
         stripPanels = frames.map { frame in
-            let panel = SpotlightStripPanel(
-                frame: frame,
-                feather: CGFloat(min(max(config.browserChromeEdgeSoftness, 0), SpotlightConfig.maxChromeLevel)) * SpotlightStripPanel.edgePointsPerLevel
-            )
+            let panel = SpotlightStripPanel(frame: frame, feather: 0)
             panel.apply(config: config)
             // Already hovering when the dim arrives: start faded out instead
             // of flashing in for a poll tick.

@@ -153,18 +153,7 @@ final class SpotlightOverlayWindow: NSPanel {
         case .medium: blurAlpha = 0.72
         case .heavy: blurAlpha = 0.9
         }
-        let newFeather = CGFloat(min(max(config.edgeSoftness, 0), SpotlightConfig.maxChromeLevel)) * Self.edgePointsPerLevel
-        let newCount = newFeather > 0 ? Self.featherSteps : 1
-        let featherChanged = newFeather != featherPoints
-        featherPoints = newFeather
-        if newCount != stages.count {
-            rebuildStages(count: newCount)
-        } else {
-            applyLook(animated: animated)
-            if featherChanged, !lastFrames.isEmpty || lastScreenFrame != .zero {
-                updateHoles(excludedFrames: lastFrames, screenFrame: lastScreenFrame, animated: animated)
-            }
-        }
+        applyLook(animated: animated)
     }
 
     /// `excludedFrames` are in the global NS screen-coordinate system
