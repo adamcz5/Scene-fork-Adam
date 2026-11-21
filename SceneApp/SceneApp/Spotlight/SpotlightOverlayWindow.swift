@@ -10,11 +10,10 @@ import SceneCore
 /// `CAShapeLayer` even-odd mask. Overlapping hole rects are pre-merged via
 /// `RectMerging.mergingOverlapping`.
 ///
-/// Soft edges: with edge softness > 0 the overlay is built from several stacked
-/// tint/blur layers whose holes are progressively larger, so the dim ramps up
-/// over a few points around each hole instead of cutting off sharply. Each
-/// layer carries a share of the total opacity so the stack adds up to the
-/// chosen darkness / blur.
+/// Soft edges: with edge softness > 0 the BLUR is built from several stacked
+/// layers whose holes are progressively larger, so it ramps up over a few
+/// points around each hole instead of cutting off sharply. The darkness stays
+/// a single solid layer. Each blur layer carries a share of the total opacity.
 ///
 /// Darkness and blur changes can be applied live (`apply(config:animated:)`),
 /// gliding from the current look to the new one instead of restarting the dim.
@@ -33,10 +32,13 @@ final class SpotlightOverlayWindow: NSPanel {
 
     private final class Stage {
         let blur = NSVisualEffectView()
-        let tint = NSView()
         let blurMask = CAShapeLayer()
-        let tintMask = CAShapeLayer()
     }
+
+    /// One full-strength tint with an exact hole: soft edges apply to the blur
+    /// only, so the dimming itself stays solid right up to a window's edge.
+    private let tint = NSView()
+    private let tintMask = CAShapeLayer()
 
     private let container: NSView
     private var stages: [Stage] = []
@@ -79,10 +81,8 @@ final class SpotlightOverlayWindow: NSPanel {
     override var canBecomeMain: Bool { false }
 
     private func rebuildStages(count: Int) {
-        for stage in stages {
-            stage.blur.removeFromSuperview()
-            stage.tint.removeFromSuperview()
-        }
+        for stage in stages { stage.blur.removeFromSuperview() }
+        tint.removeFromSuperview()
         stages = (0..<count).map { _ in
             let stage = Stage()
             stage.blur.material = .hudWindow
@@ -90,17 +90,17 @@ final class SpotlightOverlayWindow: NSPanel {
             stage.blur.state = .active
             stage.blur.wantsLayer = true
             stage.blur.layer?.mask = stage.blurMask
-            stage.tint.wantsLayer = true
-            stage.tint.layer?.mask = stage.tintMask
-            for view in [stage.blur, stage.tint] {
-                view.frame = container.bounds
-                view.autoresizingMask = [.width, .height]
-            }
+            stage.blur.frame = container.bounds
+            stage.blur.autoresizingMask = [.width, .height]
             return stage
         }
-        // blur layers first, tint layers on top
+        tint.wantsLayer = true
+        tint.layer?.mask = tintMask
+        tint.frame = container.bounds
+        tint.autoresizingMask = [.width, .height]
+        // blur layers first, the tint on top
         for stage in stages { container.addSubview(stage.blur) }
-        for stage in stages { container.addSubview(stage.tint) }
+        container.addSubview(tint)
         applyLook(animated: false)
         if !lastFrames.isEmpty || lastScreenFrame != .zero {
             updateHoles(excludedFrames: lastFrames, screenFrame: lastScreenFrame, animated: false)
@@ -115,22 +115,20 @@ final class SpotlightOverlayWindow: NSPanel {
     }
 
     private func applyLook(animated: Bool) {
-        let tintAlpha = share(of: darkness)
         let blurShare = share(of: blurAlpha)
+        let newColor = NSColor.black.withAlphaComponent(min(max(darkness, 0), 1)).cgColor
+        if animated, let layer = tint.layer {
+            let anim = CABasicAnimation(keyPath: "backgroundColor")
+            anim.fromValue = layer.presentation()?.backgroundColor ?? layer.backgroundColor
+            anim.toValue = newColor
+            anim.duration = Self.liveChangeDuration
+            anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(anim, forKey: "liveTint")
+            layer.backgroundColor = newColor
+        } else {
+            tint.layer?.backgroundColor = newColor
+        }
         for stage in stages {
-            let newColor = NSColor.black.withAlphaComponent(tintAlpha).cgColor
-            if animated, let layer = stage.tint.layer {
-                let from = layer.presentation()?.backgroundColor ?? layer.backgroundColor
-                let anim = CABasicAnimation(keyPath: "backgroundColor")
-                anim.fromValue = from
-                anim.toValue = newColor
-                anim.duration = Self.liveChangeDuration
-                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                layer.add(anim, forKey: "liveTint")
-                layer.backgroundColor = newColor
-            } else {
-                stage.tint.layer?.backgroundColor = newColor
-            }
             stage.blur.isHidden = false
             if animated {
                 NSAnimationContext.runAnimationGroup { ctx in
@@ -175,13 +173,7 @@ final class SpotlightOverlayWindow: NSPanel {
     func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect, animated: Bool = false) {
         lastFrames = excludedFrames
         lastScreenFrame = screenFrame
-        let count = stages.count
-        for (index, stage) in stages.enumerated() {
-            // Layer 0 has the biggest hole, the last layer the smallest, so the
-            // number of layers dimming a point grows with distance from the hole.
-            // Smallest layer hugs the window exactly, so the ramp starts right at
-            // its edge (no clear gap around it).
-            let grow = count > 1 ? featherPoints * CGFloat(count - 1 - index) / CGFloat(count) : 0
+        func holePath(growing grow: CGFloat) -> CGPath {
             let expanded = excludedFrames.map { $0.insetBy(dx: -grow, dy: -grow) }
             let merged = RectMerging.mergingOverlapping(expanded)
             let path = CGMutablePath()
@@ -196,18 +188,27 @@ final class SpotlightOverlayWindow: NSPanel {
                     height: clipped.height
                 ))
             }
-            for mask in [stage.blurMask, stage.tintMask] {
-                if animated, let old = mask.path {
-                    let anim = CABasicAnimation(keyPath: "path")
-                    anim.fromValue = old
-                    anim.toValue = path
-                    anim.duration = Self.baseHideAnimationDuration
-                    anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                    mask.add(anim, forKey: "holeMove")
-                }
-                mask.path = path
-                mask.fillRule = .evenOdd
+            return path
+        }
+        func set(_ mask: CAShapeLayer, to path: CGPath) {
+            if animated, let old = mask.path {
+                let anim = CABasicAnimation(keyPath: "path")
+                anim.fromValue = old
+                anim.toValue = path
+                anim.duration = Self.baseHideAnimationDuration
+                anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                mask.add(anim, forKey: "holeMove")
             }
+            mask.path = path
+            mask.fillRule = .evenOdd
+        }
+        // Tint: exact hole. Blur: stacked layers with slightly larger holes, the
+        // smallest hugging the window, so the blur ramps up just outside it.
+        set(tintMask, to: holePath(growing: 0))
+        let count = stages.count
+        for (index, stage) in stages.enumerated() {
+            let grow = count > 1 ? featherPoints * CGFloat(count - 1 - index) / CGFloat(count) : 0
+            set(stage.blurMask, to: holePath(growing: grow))
         }
     }
 
