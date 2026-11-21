@@ -151,7 +151,7 @@ final class SpotlightOverlayWindow: NSPanel {
         case .off: blurAlpha = 0
         case .light: blurAlpha = 0.32
         case .medium: blurAlpha = 0.72
-        case .heavy: blurAlpha = 0.9
+        case .heavy: blurAlpha = 1
         }
         applyLook(animated: animated)
     }
