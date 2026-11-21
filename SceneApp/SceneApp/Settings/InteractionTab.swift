@@ -191,6 +191,14 @@ struct InteractionTab: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
+            subBlock("interaction.spotlight.subsection.exceptions", hint: "interaction.spotlight.exceptions.hint") {
+                AppPickerView(
+                    bundleIDs: spotlightBinding(\.exceptionBundleIDs),
+                    label: "interaction.spotlight.exceptions.label"
+                )
+                .disabled(!settingsVM.spotlight.enabled)
+            }
+
             subBlock("interaction.spotlight.subsection.hotkey", hint: "interaction.spotlight.hotkey.hint") {
                 HotkeyField(
                     chord: spotlightBinding(\.hotkey),

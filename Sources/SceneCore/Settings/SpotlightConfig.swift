@@ -79,6 +79,10 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// system's blur materials only come in fixed, strong strengths, far too
     /// heavy for tabs you still want to half-read.
     public var browserChromeBlurRadius: Double
+    /// Apps (bundle IDs) whose windows are never dimmed, even when they aren't
+    /// the frontmost app — e.g. keep a chat window readable while working in
+    /// a browser. Chosen manually in Settings.
+    public var exceptionBundleIDs: [String]
     public static let maxChromeBlurRadius: Double = 20
     public static let defaultChromeBlurRadius: Double = 3
     /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
@@ -120,7 +124,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight,
         browserChromeDarkness: Double = SpotlightConfig.defaultChromeDarkness,
         browserChromeBlurRadius: Double = SpotlightConfig.defaultChromeBlurRadius,
-        browserChromeHotkey: HotkeyBinding? = nil
+        browserChromeHotkey: HotkeyBinding? = nil,
+        exceptionBundleIDs: [String] = []
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -135,6 +140,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeDarkness = browserChromeDarkness
         self.browserChromeBlurRadius = browserChromeBlurRadius
         self.browserChromeHotkey = browserChromeHotkey
+        self.exceptionBundleIDs = exceptionBundleIDs
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -146,6 +152,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         case browserChromeDarkness = "browserChromeTint"
         case browserChromeBlurRadius
         case browserChromeHotkey
+        case exceptionBundleIDs
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -168,6 +175,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeDarkness) ?? Self.defaultChromeDarkness
         self.browserChromeBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeBlurRadius) ?? Self.defaultChromeBlurRadius
         self.browserChromeHotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .browserChromeHotkey)
+        self.exceptionBundleIDs = try c.decodeIfPresent([String].self, forKey: .exceptionBundleIDs) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -185,5 +193,6 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeDarkness, forKey: .browserChromeDarkness)
         try c.encode(browserChromeBlurRadius, forKey: .browserChromeBlurRadius)
         try c.encodeIfPresent(browserChromeHotkey, forKey: .browserChromeHotkey)
+        try c.encode(exceptionBundleIDs, forKey: .exceptionBundleIDs)
     }
 }

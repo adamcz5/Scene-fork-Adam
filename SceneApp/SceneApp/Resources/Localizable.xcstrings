@@ -5301,6 +5301,24 @@
         "en": { "stringUnit": { "state": "translated", "value": "Press it to turn dimming off; press it again to bring it back with the same settings." } }
       }
     },
+    "interaction.spotlight.subsection.exceptions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "NEVER DIM THESE APPS" } }
+      }
+    },
+    "interaction.spotlight.exceptions.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Windows of these apps stay bright even when you are working in another app. Add them manually here." } }
+      }
+    },
+    "interaction.spotlight.exceptions.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Excluded apps" } }
+      }
+    },
     "interaction.triggers.section": {
       "extractionState": "manual",
       "localizations": {

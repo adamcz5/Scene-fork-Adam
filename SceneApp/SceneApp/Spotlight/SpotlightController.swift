@@ -335,11 +335,12 @@ final class SpotlightController {
     private func showSpotlight() {
         showTimer = nil
         guard config.enabled, permissionGranted else { return }
-        let frames = currentExclusionFrames()
+        var frames = currentExclusionFrames()
         // Nothing to protect (no focused window resolvable, or the
         // frontmost app has no visible windows) — showing a full-screen dim
         // with no hole at all would be actively unhelpful, so skip.
         guard !frames.isEmpty else { return }
+        frames += exceptionAppFrames()
         for overlay in overlays {
             overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame)
             overlay.show()
@@ -405,6 +406,32 @@ final class SpotlightController {
             }
             return frames
         }
+    }
+
+    /// Visible, normal-layer windows of the apps the user listed as never to
+    /// be dimmed, in NS screen coordinates. Uses the window list (no
+    /// accessibility needed) and is evaluated each time the dim fades in.
+    private func exceptionAppFrames() -> [CGRect] {
+        let ids = Set(config.exceptionBundleIDs)
+        guard !ids.isEmpty else { return [] }
+        let pids = Set(NSWorkspace.shared.runningApplications.compactMap { app -> pid_t? in
+            guard let id = app.bundleIdentifier, ids.contains(id) else { return nil }
+            return app.processIdentifier
+        })
+        guard !pids.isEmpty,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return [] }
+        var result: [CGRect] = []
+        for info in list {
+            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, pids.contains(pid),
+                  (info[kCGWindowLayer as String] as? Int) == 0,
+                  let boundsDict = info[kCGWindowBounds as String] as? [String: Any],
+                  let cgFrame = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
+                  cgFrame.width > 40, cgFrame.height > 40
+            else { continue }
+            result.append(DisplayCoordinates.axToNS(cgFrame))
+        }
+        return result
     }
 
     private func exclusionFrame(of windowElement: AXUIElement?) -> CGRect? {
