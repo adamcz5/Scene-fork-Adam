@@ -74,7 +74,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// it can be darker and less blurred (blurring tabs makes them unreadable
     /// well before they're hidden enough).
     public var browserChromeDarkness: Double
-    public var browserChromeBlur: SpotlightBlurPreset
+    /// Blur radius behind the top bar, in points; `0` is no blur. A radius
+    /// rather than the off/light/heavy presets the full-screen dim uses: the
+    /// system's blur materials only come in fixed, strong strengths, far too
+    /// heavy for tabs you still want to half-read.
+    public var browserChromeBlurRadius: Double
+    public static let maxChromeBlurRadius: Double = 20
+    public static let defaultChromeBlurRadius: Double = 3
     /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
     /// which toggles Dim as a whole.
     public var browserChromeHotkey: HotkeyBinding?
@@ -113,7 +119,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         browserChromeMode: SpotlightChromeMode = .automatic,
         browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight,
         browserChromeDarkness: Double = SpotlightConfig.defaultChromeDarkness,
-        browserChromeBlur: SpotlightBlurPreset = .off,
+        browserChromeBlurRadius: Double = SpotlightConfig.defaultChromeBlurRadius,
         browserChromeHotkey: HotkeyBinding? = nil
     ) {
         self.enabled = enabled
@@ -127,7 +133,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeMode = browserChromeMode
         self.browserChromeHeight = browserChromeHeight
         self.browserChromeDarkness = browserChromeDarkness
-        self.browserChromeBlur = browserChromeBlur
+        self.browserChromeBlurRadius = browserChromeBlurRadius
         self.browserChromeHotkey = browserChromeHotkey
     }
 
@@ -138,7 +144,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         // heavier than the main dim; new storage keys make every install pick
         // up the corrected defaults instead of keeping the saved old ones.
         case browserChromeDarkness = "browserChromeTint"
-        case browserChromeBlur = "browserChromeBlurLevel"
+        case browserChromeBlurRadius
         case browserChromeHotkey
     }
 
@@ -160,7 +166,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeMode = try c.decodeIfPresent(SpotlightChromeMode.self, forKey: .browserChromeMode) ?? .automatic
         self.browserChromeHeight = try c.decodeIfPresent(Double.self, forKey: .browserChromeHeight) ?? Self.defaultChromeHeight
         self.browserChromeDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeDarkness) ?? Self.defaultChromeDarkness
-        self.browserChromeBlur = try c.decodeIfPresent(SpotlightBlurPreset.self, forKey: .browserChromeBlur) ?? .off
+        self.browserChromeBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeBlurRadius) ?? Self.defaultChromeBlurRadius
         self.browserChromeHotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .browserChromeHotkey)
     }
 
@@ -177,7 +183,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeMode, forKey: .browserChromeMode)
         try c.encode(browserChromeHeight, forKey: .browserChromeHeight)
         try c.encode(browserChromeDarkness, forKey: .browserChromeDarkness)
-        try c.encode(browserChromeBlur, forKey: .browserChromeBlur)
+        try c.encode(browserChromeBlurRadius, forKey: .browserChromeBlurRadius)
         try c.encodeIfPresent(browserChromeHotkey, forKey: .browserChromeHotkey)
     }
 }

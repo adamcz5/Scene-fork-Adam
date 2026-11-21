@@ -235,18 +235,39 @@ struct MenuBarContentView: View {
     /// globally). Per-monitor stays clickable while Dim is off so the choice
     /// is already made when Dim is turned back on.
     private var dimTilesRow: some View {
-        VStack(spacing: 6) {
+        let dim = settingsVM.spotlight
+        return VStack(spacing: 6) {
+            dimTile(
+                dim.enabled ? "menu.dim.on" : "menu.dim.off",
+                systemImage: "moon.fill",
+                isOn: dim.enabled,
+                help: "menu.dim.help",
+                action: toggleDimEnabled
+            )
             HStack(spacing: 6) {
-                dimTile("menu.dim.enable", systemImage: "moon.fill", isOn: settingsVM.spotlight.enabled, action: toggleDimEnabled)
-                dimTile("menu.dim.per_monitor", systemImage: "rectangle.on.rectangle", isOn: settingsVM.spotlight.exclusionMode == .perMonitor, action: toggleDimPerMonitor)
+                dimTile(
+                    dim.exclusionMode == .perMonitor ? "menu.dim.mode.local" : "menu.dim.mode.global",
+                    systemImage: "rectangle.on.rectangle",
+                    isOn: dim.exclusionMode == .perMonitor,
+                    help: "menu.dim.mode.help",
+                    action: toggleDimPerMonitor
+                )
+                dimTile(
+                    dim.dimBrowserChrome ? "menu.dim.tabs.on" : "menu.dim.tabs.off",
+                    systemImage: "macwindow",
+                    isOn: dim.dimBrowserChrome,
+                    help: "menu.dim.tabs.help",
+                    action: toggleDimBrowserTabs
+                )
             }
-            dimTile("menu.dim.browser_tabs", systemImage: "macwindow", isOn: settingsVM.spotlight.dimBrowserChrome, action: toggleDimBrowserTabs)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
     }
 
-    private func dimTile(_ title: LocalizedStringKey, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+    /// A tile's title says its CURRENT state (e.g. "Dim: On" / "Dim: Off"),
+    /// and it is highlighted while that state is "on".
+    private func dimTile(_ title: LocalizedStringKey, systemImage: String, isOn: Bool, help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
@@ -264,6 +285,7 @@ struct MenuBarContentView: View {
             .contentShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+        .help(help)
     }
 
     private var layoutsDisclosureRow: some View {

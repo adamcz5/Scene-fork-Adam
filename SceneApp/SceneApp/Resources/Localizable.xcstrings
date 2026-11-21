@@ -5619,6 +5619,66 @@
         "en": { "stringUnit": { "state": "translated", "value": "Dim browser tabs" } }
       }
     },
+    "interaction.spotlight.blur.strong": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Strong" } }
+      }
+    },
+    "menu.dim.on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim: On" } }
+      }
+    },
+    "menu.dim.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim: Off" } }
+      }
+    },
+    "menu.dim.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn the dimming on or off." } }
+      }
+    },
+    "menu.dim.mode.global": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Global" } }
+      }
+    },
+    "menu.dim.mode.local": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Local" } }
+      }
+    },
+    "menu.dim.mode.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Global: one window stays clear across all displays. Local: one window stays clear on each display." } }
+      }
+    },
+    "menu.dim.tabs.on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: On" } }
+      }
+    },
+    "menu.dim.tabs.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: Off" } }
+      }
+    },
+    "menu.dim.tabs.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim the browser's tab bar and address bar." } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {

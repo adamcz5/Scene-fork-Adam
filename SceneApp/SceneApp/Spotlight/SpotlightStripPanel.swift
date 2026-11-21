@@ -3,8 +3,12 @@ import SceneCore
 
 /// A small click-through panel laid over a browser's top bar (tabs, address
 /// bar, bookmarks) that dims it with its OWN darkness and blur — separate from
-/// the full-screen dim so it can be darker and sharper — and that fades away
+/// the full-screen dim so it can be darker and far sharper — and that fades away
 /// while the mouse is over it, so the bar is usable on demand.
+///
+/// The blur is a continuous radius (`WindowBackgroundBlur`), not an
+/// `NSVisualEffectView` material: the system materials only come in fixed,
+/// very strong strengths, which turned the tabs into mush.
 ///
 /// It can't use a tracking area to notice the mouse because it ignores mouse
 /// events (clicks must reach the browser underneath), so `SpotlightController`
@@ -14,9 +18,9 @@ final class SpotlightStripPanel: NSPanel {
     private static let baseHideDuration: TimeInterval = 0.15
     private static let hoverDuration: TimeInterval = 0.12
 
-    private let blurView = NSVisualEffectView()
     private let tintView = NSView()
     private var speed: Double = SpotlightConfig.defaultSpeed
+    private var blurRadius: Int = 0
     private var hovered = false
     private var shown = false
 
@@ -39,17 +43,10 @@ final class SpotlightStripPanel: NSPanel {
         collectionBehavior = [.stationary, .ignoresCycle]
         alphaValue = 0
 
-        blurView.blendingMode = .behindWindow
-        blurView.state = .active
         tintView.wantsLayer = true
-
-        let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
-        for view in [blurView, tintView] {
-            view.frame = container.bounds
-            view.autoresizingMask = [.width, .height]
-            container.addSubview(view)
-        }
-        contentView = container
+        tintView.frame = NSRect(origin: .zero, size: frame.size)
+        tintView.autoresizingMask = [.width, .height]
+        contentView = tintView
         setFrame(frame, display: false)
     }
 
@@ -58,15 +55,16 @@ final class SpotlightStripPanel: NSPanel {
 
     func apply(config: SpotlightConfig) {
         speed = min(max(config.speed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
-        SpotlightLook.apply(
-            blurView: blurView, tintView: tintView,
-            darkness: config.browserChromeDarkness, blur: config.browserChromeBlur
-        )
+        let darkness = min(max(config.browserChromeDarkness, 0), 1)
+        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(darkness).cgColor
+        blurRadius = Int(min(max(config.browserChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius).rounded())
+        if shown && !hovered { applyBlur() }
     }
 
     func show() {
         shown = true
         orderFrontRegardless()
+        if !hovered { applyBlur() }
         animate(to: hovered ? 0 : 1, duration: Self.baseShowDuration / speed, timing: .easeOut)
     }
 
@@ -75,6 +73,7 @@ final class SpotlightStripPanel: NSPanel {
         shown = false
         if immediate {
             alphaValue = 0
+            clearBlur()
             orderOut(nil)
             return
         }
@@ -86,16 +85,32 @@ final class SpotlightStripPanel: NSPanel {
             // A later `show()` during the fade re-raises alpha first; only
             // order out if we're still actually hidden.
             guard let self, !self.shown else { return }
+            self.clearBlur()
             self.orderOut(nil)
         })
     }
 
-    /// Pointer is over (or left) the strip: fade it out of the way / back in.
+    /// Pointer is over (or left) the strip: clear it out of the way / bring it
+    /// back. The blur is switched off immediately rather than faded, since the
+    /// window-background blur doesn't follow the window's alpha.
     func setHovered(_ isHovered: Bool) {
         guard isHovered != hovered else { return }
         hovered = isHovered
         guard shown else { return }
+        if isHovered {
+            clearBlur()
+        } else {
+            applyBlur()
+        }
         animate(to: isHovered ? 0 : 1, duration: Self.hoverDuration, timing: .easeInEaseOut)
+    }
+
+    private func applyBlur() {
+        WindowBackgroundBlur.set(radius: blurRadius, for: self)
+    }
+
+    private func clearBlur() {
+        WindowBackgroundBlur.set(radius: 0, for: self)
     }
 
     private func animate(to alpha: CGFloat, duration: TimeInterval, timing: CAMediaTimingFunctionName) {
@@ -104,5 +119,33 @@ final class SpotlightStripPanel: NSPanel {
             ctx.timingFunction = CAMediaTimingFunction(name: timing)
             animator().alphaValue = alpha
         }
+    }
+}
+
+/// Continuous-radius blur of whatever is behind a transparent window, via the
+/// window server's background-blur call (what terminal apps use for a blur
+/// slider). It is private API, so it is looked up at runtime: if it's missing
+/// or changes, the call quietly does nothing and the window just shows its
+/// tint — never a crash or a link failure.
+enum WindowBackgroundBlur {
+    private typealias DefaultConnection = @convention(c) () -> Int32
+    private typealias SetBlurRadius = @convention(c) (Int32, Int32, Int32) -> Int32
+
+    /// `RTLD_DEFAULT`, which Swift doesn't import: search every loaded image.
+    private static let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
+
+    private static let connection: DefaultConnection? = {
+        guard let symbol = dlsym(defaultHandle, "CGSDefaultConnectionForThread") else { return nil }
+        return unsafeBitCast(symbol, to: DefaultConnection.self)
+    }()
+
+    private static let setRadius: SetBlurRadius? = {
+        guard let symbol = dlsym(defaultHandle, "CGSSetWindowBackgroundBlurRadius") else { return nil }
+        return unsafeBitCast(symbol, to: SetBlurRadius.self)
+    }()
+
+    static func set(radius: Int, for window: NSWindow) {
+        guard window.windowNumber > 0, let connection, let setRadius else { return }
+        _ = setRadius(connection(), Int32(window.windowNumber), Int32(max(radius, 0)))
     }
 }

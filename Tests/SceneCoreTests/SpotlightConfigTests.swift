@@ -15,7 +15,7 @@ final class SpotlightConfigTests: XCTestCase {
         XCTAssertEqual(d.browserChromeMode, .automatic)
         XCTAssertEqual(d.browserChromeHeight, SpotlightConfig.defaultChromeHeight)
         XCTAssertEqual(d.browserChromeDarkness, SpotlightConfig.defaultChromeDarkness)
-        XCTAssertEqual(d.browserChromeBlur, .off)
+        XCTAssertEqual(d.browserChromeBlurRadius, SpotlightConfig.defaultChromeBlurRadius)
         XCTAssertNil(d.browserChromeHotkey)
     }
 
@@ -32,7 +32,7 @@ final class SpotlightConfigTests: XCTestCase {
             browserChromeMode: .fixedHeight,
             browserChromeHeight: 120,
             browserChromeDarkness: 0.8,
-            browserChromeBlur: .heavy,
+            browserChromeBlurRadius: 8,
             browserChromeHotkey: HotkeyBinding(keyCode: 3, modifiers: [.command, .shift])
         )
         let data = try JSONEncoder().encode(original)
