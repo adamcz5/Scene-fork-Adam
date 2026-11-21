@@ -265,27 +265,8 @@ struct MenuBarContentView: View {
         .padding(.vertical, 2)
     }
 
-    /// A tile's title says its CURRENT state (e.g. "Dim: On" / "Dim: Off"),
-    /// and it is highlighted while that state is "on".
     private func dimTile(_ title: LocalizedStringKey, systemImage: String, isOn: Bool, help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                Text(title).lineLimit(1)
-            }
-            .font(.callout)
-            .fontWeight(isOn ? .semibold : .regular)
-            .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isOn ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.06))
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .help(help)
+        DimTileButton(title: title, systemImage: systemImage, isOn: isOn, help: help, action: action)
     }
 
     private var layoutsDisclosureRow: some View {

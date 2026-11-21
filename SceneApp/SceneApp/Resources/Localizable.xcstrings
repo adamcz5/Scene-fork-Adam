@@ -5196,7 +5196,7 @@
     "interaction.spotlight.section": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Spotlight (Dim)" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Focus Mode (Dimming)" } }
       }
     },
     "interaction.spotlight.per_monitor": {
@@ -5610,13 +5610,13 @@
     "interaction.spotlight.chrome.darkness": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Top bar darkness" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Darkness" } }
       }
     },
     "interaction.spotlight.chrome.blur": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Top bar blur" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Blur" } }
       }
     },
     "interaction.spotlight.chrome_hotkey": {
@@ -5712,13 +5712,43 @@
     "interaction.spotlight.chrome.delay": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Top bar delay" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Fade delay" } }
       }
     },
     "interaction.spotlight.chrome.speed": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Top bar fade speed" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Fade speed" } }
+      }
+    },
+    "interaction.chrome.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Browser Tab Bar Dimming" } }
+      }
+    },
+    "interaction.chrome.state.on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "On" } }
+      }
+    },
+    "interaction.chrome.state.lite": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Lite" } }
+      }
+    },
+    "interaction.chrome.state.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Off" } }
+      }
+    },
+    "interaction.excluded.section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dimming excluded apps" } }
       }
     },
     "menu.dim.tabs.help": {
@@ -5730,7 +5760,7 @@
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Darkens and blurs everything except whatever you're actively working in, so the rest of the screen stops competing for attention." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Apps dimming" } }
       }
     },
     "interaction.spotlight.enable": {
@@ -5808,7 +5838,7 @@
     "interaction.spotlight.delay": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Delay before dimming" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Fade delay" } }
       }
     },
     "interaction.spotlight.delay.min": {

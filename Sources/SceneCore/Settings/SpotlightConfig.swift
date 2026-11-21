@@ -122,17 +122,20 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     public static let maxChromeHeight: Double = 220
     public static let defaultChromeHeight: Double = 90
 
-    public static let minIdleDelaySeconds: Double = 1
-    public static let maxIdleDelaySeconds: Double = 8
+    public static let minIdleDelaySeconds: Double = 0
+    public static let maxIdleDelaySeconds: Double = 10
     public static let defaultIdleDelaySeconds: Double = 2.5
 
     public static let minDarkness: Double = 0.2
     public static let maxDarkness: Double = 0.9
     public static let defaultDarkness: Double = 0.45
 
-    public static let minSpeed: Double = 0.1
-    public static let maxSpeed: Double = 3
+    public static let minSpeed: Double = 0.05
+    public static let maxSpeed: Double = 3.5
     public static let defaultSpeed: Double = 1
+    /// Fade-in length in seconds at `speed == 1`; Settings shows the fade as
+    /// seconds (`fadeBaseSeconds / speed`).
+    public static let fadeBaseSeconds: Double = 0.35
 
     /// `enabled: false` by default — this changes what's visually on screen
     /// at all times once on, so it should be an explicit opt-in rather than

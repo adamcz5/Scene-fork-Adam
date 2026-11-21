@@ -31,6 +31,8 @@ struct InteractionTab: View {
                 dragSwapCard
                 appSwitcherCard
                 spotlightCard
+                tabBarCard
+                excludedAppsCard
                 workspaceTriggersCard
             }
             .padding(24)
@@ -124,132 +126,149 @@ struct InteractionTab: View {
         }
     }
 
-    /// Spotlight (dim) card. Everything here is a plain on/off or a single
-    /// slider/picker — no setting overrides another.
+    /// Dim card: the two tiles (same as the menu bar), the shortcut, and the
+    /// look/timing sliders — one unified block.
     private var spotlightCard: some View {
-        card("interaction.spotlight.section", hint: "interaction.spotlight.section.hint") {
-            Toggle("interaction.spotlight.enable", isOn: spotlightBinding(\.enabled))
+        let dim = settingsVM.spotlight
+        return card("interaction.spotlight.section", hint: "interaction.spotlight.section.hint") {
+            HStack(spacing: 8) {
+                DimTileButton(
+                    title: dim.enabled ? "menu.dim.on" : "menu.dim.off",
+                    systemImage: "moon.fill", isOn: dim.enabled, help: "menu.dim.help",
+                    action: { var c = settingsVM.spotlight; c.enabled.toggle(); try? settingsVM.store.setSpotlight(c) }
+                )
+                DimTileButton(
+                    title: dim.exclusionMode == .perMonitor ? "menu.dim.mode.local" : "menu.dim.mode.global",
+                    systemImage: "rectangle.on.rectangle", isOn: dim.exclusionMode == .perMonitor, help: "menu.dim.mode.help",
+                    action: { var c = settingsVM.spotlight; c.exclusionMode = c.exclusionMode == .single ? .perMonitor : .single; try? settingsVM.store.setSpotlight(c) }
+                )
+            }
 
-            Toggle("interaction.spotlight.per_monitor", isOn: perMonitorBinding)
-                .disabled(!settingsVM.spotlight.enabled)
-            Text("interaction.spotlight.per_monitor.hint")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            HotkeyField(
+                chord: spotlightBinding(\.hotkey),
+                label: "interaction.spotlight.hotkey",
+                validate: { validateDimHotkey($0, slot: .dim) }
+            )
 
-            subBlock("interaction.spotlight.subsection.look") {
-                uniformSlider("interaction.spotlight.darkness", value: spotlightBinding(\.darkness),
-                              range: SpotlightConfig.minDarkness...SpotlightConfig.maxDarkness, step: 0.05,
-                              minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max",
-                              valueText: String(format: "%.0f%%", settingsVM.spotlight.darkness * 100))
-                .disabled(!settingsVM.spotlight.enabled)
+            uniformSlider("interaction.spotlight.darkness", value: spotlightBinding(\.darkness),
+                          range: SpotlightConfig.minDarkness...SpotlightConfig.maxDarkness, step: 0.07,
+                          minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max",
+                          valueText: String(Int(((dim.darkness - SpotlightConfig.minDarkness) / 0.07).rounded())))
 
-                Picker("interaction.spotlight.blur", selection: spotlightBinding(\.blurPreset)) {
+            HStack(spacing: 8) {
+                Text("interaction.spotlight.blur").frame(width: 150, alignment: .leading)
+                Picker("", selection: spotlightBinding(\.blurPreset)) {
                     Text("interaction.spotlight.blur.off").tag(SpotlightBlurPreset.off)
                     Text("interaction.spotlight.blur.light").tag(SpotlightBlurPreset.light)
                     Text("interaction.spotlight.blur.heavy").tag(SpotlightBlurPreset.heavy)
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
-                .disabled(!settingsVM.spotlight.enabled)
-
-                uniformSlider("interaction.spotlight.speed", value: spotlightBinding(\.speed),
-                              range: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed, step: 0.1,
-                              minLabel: "interaction.spotlight.speed.min", maxLabel: "interaction.spotlight.speed.max",
-                              valueText: String(format: "%.1f×", settingsVM.spotlight.speed))
-                .disabled(!settingsVM.spotlight.enabled)
             }
 
-            subBlock("interaction.spotlight.subsection.delay", hint: "interaction.spotlight.delay.hint") {
-                uniformSlider("interaction.spotlight.delay", value: spotlightBinding(\.idleDelaySeconds),
-                              range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 0.5,
+            uniformSlider("interaction.spotlight.delay", value: spotlightBinding(\.idleDelaySeconds),
+                          range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 1,
+                          minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
+                          valueText: String(format: "%.1fs", dim.idleDelaySeconds))
+            uniformSlider("interaction.spotlight.speed", value: fadeSecondsBinding(\.speed),
+                          range: 0.5...5, step: 0.5,
+                          minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
+                          valueText: String(format: "%.1fs", SpotlightConfig.fadeBaseSeconds / max(dim.speed, 0.01)))
+        }
+    }
+
+    private enum TabBarState { case on, lite, off }
+
+    private func setTabBarState(_ state: TabBarState) {
+        var c = settingsVM.spotlight
+        c.dimBrowserChrome = state != .off
+        c.browserChromeLight = state == .lite
+        try? settingsVM.store.setSpotlight(c)
+    }
+
+    /// Browser tab bar card: On / Lite / Off tiles, shortcut, sliders, and the
+    /// (smaller) detection settings.
+    private var tabBarCard: some View {
+        let dim = settingsVM.spotlight
+        let current: TabBarState = !dim.dimBrowserChrome ? .off : (dim.browserChromeLight ? .lite : .on)
+        let off = current == .off
+        return card("interaction.chrome.section") {
+            HStack(spacing: 8) {
+                DimTileButton(title: "interaction.chrome.state.on", systemImage: "macwindow", isOn: current == .on,
+                              help: "menu.dim.tabs.help", action: { setTabBarState(.on) })
+                DimTileButton(title: "interaction.chrome.state.lite", systemImage: "macwindow", isOn: current == .lite,
+                              help: "menu.dim.tabs.help", action: { setTabBarState(.lite) })
+                DimTileButton(title: "interaction.chrome.state.off", systemImage: "macwindow", isOn: current == .off,
+                              help: "menu.dim.tabs.help", action: { setTabBarState(.off) })
+            }
+
+            HotkeyField(
+                chord: spotlightBinding(\.browserChromeHotkey),
+                label: "interaction.spotlight.chrome_hotkey",
+                validate: { validateDimHotkey($0, slot: .browserChrome) }
+            )
+
+            Group {
+                levelSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
+                            minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                levelSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
+                            minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                levelSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
+                            minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                levelSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
+                            minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                uniformSlider("interaction.spotlight.chrome.delay", value: spotlightBinding(\.browserChromeDelaySeconds),
+                              range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 1,
                               minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
-                              valueText: String(format: "%.1fs", settingsVM.spotlight.idleDelaySeconds))
-                .disabled(!settingsVM.spotlight.enabled)
+                              valueText: String(format: "%.1fs", dim.browserChromeDelaySeconds))
+                uniformSlider("interaction.spotlight.chrome.speed", value: fadeSecondsBinding(\.browserChromeSpeed),
+                              range: 0.5...5, step: 0.5,
+                              minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
+                              valueText: String(format: "%.1fs", SpotlightConfig.fadeBaseSeconds / max(dim.browserChromeSpeed, 0.01)))
             }
+            .disabled(off)
 
-            subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
-                // Its own switch: independent of the main Dim toggle's other
-                // settings, and always editable (it only takes effect while
-                // Dim is on).
-                Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightBinding(\.dimBrowserChrome))
+            VStack(alignment: .leading, spacing: 6) {
+                Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
+                    Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
+                    Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)
+                }
+                .pickerStyle(.segmented)
 
-                HotkeyField(
-                    chord: spotlightBinding(\.browserChromeHotkey),
-                    label: "interaction.spotlight.chrome_hotkey",
-                    validate: { validateDimHotkey($0, slot: .browserChrome) }
-                )
-                Text("interaction.spotlight.chrome_hotkey.hint")
+                if dim.browserChromeMode == .fixedHeight {
+                    uniformSlider("interaction.spotlight.chrome.height", value: spotlightBinding(\.browserChromeHeight),
+                                  range: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight, step: 18,
+                                  minLabel: "interaction.spotlight.chrome.height.min", maxLabel: "interaction.spotlight.chrome.height.max",
+                                  valueText: String(Int(dim.browserChromeHeight)))
+                }
+
+                HStack(spacing: 8) {
+                    Button("interaction.spotlight.chrome.test") { runChromeTest() }
+                        .controlSize(.small)
+                        .disabled(isTestingChrome)
+                    if isTestingChrome { ProgressView().controlSize(.small) }
+                }
+                if let chromeTestResult {
+                    Text(chromeTestResult)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("interaction.spotlight.dim_browser_chrome.hint")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-
-                if settingsVM.spotlight.dimBrowserChrome {
-                    uniformSlider("interaction.spotlight.chrome.delay", value: spotlightBinding(\.browserChromeDelaySeconds),
-                                  range: SpotlightConfig.minIdleDelaySeconds...SpotlightConfig.maxIdleDelaySeconds, step: 0.5,
-                                  minLabel: "interaction.spotlight.delay.min", maxLabel: "interaction.spotlight.delay.max",
-                                  valueText: String(format: "%.1fs", settingsVM.spotlight.browserChromeDelaySeconds))
-                    uniformSlider("interaction.spotlight.chrome.speed", value: spotlightBinding(\.browserChromeSpeed),
-                                  range: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed, step: 0.1,
-                                  minLabel: "interaction.spotlight.speed.min", maxLabel: "interaction.spotlight.speed.max",
-                                  valueText: String(format: "%.1f×", settingsVM.spotlight.browserChromeSpeed))
-                    levelSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
-                                minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
-                    levelSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
-                                minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
-                    levelSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
-                                minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
-                    levelSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
-                                minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
-
-                    Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
-                        Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
-                        Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if settingsVM.spotlight.browserChromeMode == .fixedHeight {
-                        uniformSlider("interaction.spotlight.chrome.height", value: spotlightBinding(\.browserChromeHeight),
-                                      range: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight,
-                                      minLabel: "interaction.spotlight.chrome.height.min", maxLabel: "interaction.spotlight.chrome.height.max")
-                        Text(String(format: String(localized: "interaction.spotlight.chrome.height.value"), Int(settingsVM.spotlight.browserChromeHeight)))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button("interaction.spotlight.chrome.test") { runChromeTest() }
-                            .controlSize(.small)
-                            .disabled(isTestingChrome)
-                        if isTestingChrome {
-                            ProgressView().controlSize(.small)
-                        }
-                    }
-                    if let chromeTestResult {
-                        Text(chromeTestResult)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
             }
+        }
+    }
 
-            subBlock("interaction.spotlight.subsection.exceptions", hint: "interaction.spotlight.exceptions.hint") {
-                AppPickerView(
-                    bundleIDs: spotlightBinding(\.exceptionBundleIDs),
-                    label: "interaction.spotlight.exceptions.label"
-                )
-                .disabled(!settingsVM.spotlight.enabled)
-            }
-
-            subBlock("interaction.spotlight.subsection.hotkey", hint: "interaction.spotlight.hotkey.hint") {
-                HotkeyField(
-                    chord: spotlightBinding(\.hotkey),
-                    label: "interaction.spotlight.hotkey",
-                    validate: { validateDimHotkey($0, slot: .dim) }
-                )
-            }
-
-            Text("interaction.spotlight.hint")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    /// Small card listing apps that stay bright while everything else dims.
+    private var excludedAppsCard: some View {
+        card("interaction.excluded.section", compact: true) {
+            AppPickerView(
+                bundleIDs: spotlightBinding(\.exceptionBundleIDs),
+                label: "interaction.spotlight.exceptions.label",
+                showsLabel: false
+            )
         }
     }
 
@@ -384,12 +403,13 @@ struct InteractionTab: View {
     private func card<Content: View>(
         _ title: LocalizedStringKey,
         hint: LocalizedStringKey? = nil,
+        compact: Bool = false,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: compact ? 8 : 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.title3)
+                    .font(compact ? .subheadline : .title3)
                     .bold()
                 if let hint {
                     Text(hint)
@@ -399,7 +419,7 @@ struct InteractionTab: View {
             }
             content()
         }
-        .padding(18)
+        .padding(compact ? 12 : 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.06)))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
@@ -588,6 +608,19 @@ struct InteractionTab: View {
     ) -> some View {
         uniformSlider(label, value: value, range: 0...SpotlightConfig.maxChromeLevel, step: 1,
                       minLabel: minLabel, maxLabel: maxLabel, valueText: String(Int(value.wrappedValue.rounded())))
+    }
+
+    /// Shows a fade as seconds (`fadeBaseSeconds / speed`) while the config
+    /// keeps storing the speed multiplier.
+    private func fadeSecondsBinding(_ keyPath: WritableKeyPath<SpotlightConfig, Double>) -> Binding<Double> {
+        Binding(
+            get: { SpotlightConfig.fadeBaseSeconds / max(settingsVM.spotlight[keyPath: keyPath], 0.01) },
+            set: { seconds in
+                var config = settingsVM.spotlight
+                config[keyPath: keyPath] = SpotlightConfig.fadeBaseSeconds / max(seconds, 0.05)
+                try? settingsVM.store.setSpotlight(config)
+            }
+        )
     }
 
     private func spotlightBinding<T>(_ keyPath: WritableKeyPath<SpotlightConfig, T>) -> Binding<T> {

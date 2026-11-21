@@ -14,11 +14,12 @@ import UniformTypeIdentifiers
 struct AppPickerView: View {
     @Binding var bundleIDs: [String]
     let label: LocalizedStringKey
+    var showsLabel: Bool = true
     @State private var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.headline)
+            if showsLabel { Text(label).font(.headline) }
             HStack {
                 Spacer()
                 Button("workspace.editor.apps.add") {
