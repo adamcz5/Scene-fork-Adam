@@ -90,7 +90,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// (`browserChromeEdgeSoftness`). 0 = hard edge.
     public var edgeSoftness: Double
     public var browserChromeEdgeSoftness: Double
-    public static let defaultEdgeSoftness: Double = 3
+    public static let defaultEdgeSoftness: Double = 2
     public static let defaultChromeEdgeSoftness: Double = 4
     public static let maxChromeLevel: Double = 10
     public static let chromeAlphaPerLevel: Double = 0.07

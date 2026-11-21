@@ -24,13 +24,15 @@ final class SpotlightStripPanel: NSPanel {
     private static let baseHideDuration: TimeInterval = 0.15
     private static let hoverDuration: TimeInterval = 0.12
     private static let liveChangeDuration: TimeInterval = 0.3
-    private static let bandCount = 4
-    static let edgePointsPerLevel: CGFloat = 4
+    private static let bandCount = 6
+    static let edgePointsPerLevel: CGFloat = 8
 
     private let tintView = NSView()
     private let topScale: CGFloat
     private let bottomScale: CGFloat
     private var bands: [SpotlightStripPanel] = []
+    private let isBand: Bool
+    private var lastBlurInt: Int = -1
     private var speed: Double = SpotlightConfig.defaultSpeed
     /// Blur radius this panel should have when fully shown (already scaled for bands).
     private var targetBlur: Double = 0
@@ -69,6 +71,7 @@ final class SpotlightStripPanel: NSPanel {
     private init(frame: CGRect, topScale: CGFloat, bottomScale: CGFloat) {
         self.topScale = topScale
         self.bottomScale = bottomScale
+        self.isBand = topScale != 1 || bottomScale != 1
         super.init(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -126,11 +129,14 @@ final class SpotlightStripPanel: NSPanel {
         } else {
             tintView.layer?.backgroundColor = color
         }
-        targetBlur = min(max(config.effectiveChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius) * midScale
+        for band in bands { band.apply(config: config, animated: animated) }
+        // Bands never drive the blur themselves: the bar's panel pushes one
+        // shared radius to every band (scaled), so there is a single timer.
+        guard !isBand else { return }
+        targetBlur = min(max(config.effectiveChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius)
         if shown && !hovered {
             if animated { glideBlur() } else { setBlur(targetBlur) }
         }
-        for band in bands { band.apply(config: config, animated: animated) }
     }
 
     func show(quick: Bool = false) {
@@ -139,7 +145,7 @@ final class SpotlightStripPanel: NSPanel {
         let fade = quick ? Self.baseHideDuration : Self.baseShowDuration / speed
         // The blur isn't part of the window's opacity fade, so it is ramped by
         // hand over the same time and with the same ease-in/ease-out curve.
-        if !hovered { glideBlur(from: 0, duration: fade) }
+        if !isBand, !hovered { glideBlur(from: 0, duration: fade) }
         animate(to: hovered ? 0 : 1, duration: fade, timing: .easeInEaseOut)
         for band in bands { band.show(quick: quick) }
     }
@@ -200,42 +206,50 @@ final class SpotlightStripPanel: NSPanel {
         hovered = false
         guard shown else { return }
         let fade = Self.baseShowDuration / speed
-        glideBlur(from: 0, duration: fade)
+        if !isBand { glideBlur(from: 0, duration: fade) }
         animate(to: 1, duration: fade, timing: .easeInEaseOut)
     }
 
     // MARK: - Blur
 
+    /// Sets this panel's blur (scaled for bands) and every band's, skipping the
+    /// window-server call when the whole-number radius hasn't changed.
+    private func pushBlur(_ radius: Double) {
+        displayedBlur = radius
+        let scaled = Int((radius * (isBand ? midScale : 1)).rounded())
+        if scaled != lastBlurInt {
+            lastBlurInt = scaled
+            WindowBackgroundBlur.set(radius: scaled, for: self)
+        }
+        for band in bands { band.pushBlur(radius) }
+    }
+
     private func setBlur(_ radius: Double) {
         blurTimer?.invalidate()
         blurTimer = nil
-        displayedBlur = radius
-        WindowBackgroundBlur.set(radius: Int(radius.rounded()), for: self)
+        pushBlur(radius)
     }
 
     private func clearBlur() {
         blurTimer?.invalidate()
         blurTimer = nil
-        displayedBlur = 0
-        WindowBackgroundBlur.set(radius: 0, for: self)
+        pushBlur(0)
     }
 
-    /// The window-background blur call has no animation of its own, so a live
-    /// change steps the radius by hand from where it is to the new value.
+    /// The window-background blur call has no animation of its own, so the
+    /// radius is stepped by hand — linearly, because the radius only takes
+    /// whole numbers and a small blur has just a few steps to spread out.
     private func glideBlur(from startRadius: Double? = nil, duration: TimeInterval = SpotlightStripPanel.liveChangeDuration) {
         blurTimer?.invalidate()
         let start = startRadius ?? displayedBlur
-        displayedBlur = start
-        WindowBackgroundBlur.set(radius: Int(start.rounded()), for: self)
+        pushBlur(start)
         let end = targetBlur
         guard start != end else { return }
         let began = Date()
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] t in
             guard let self else { t.invalidate(); return }
             let progress = min(Date().timeIntervalSince(began) / max(duration, 0.01), 1)
-            let eased = progress * progress * (3 - 2 * progress)
-            self.displayedBlur = start + (end - start) * eased
-            WindowBackgroundBlur.set(radius: Int(self.displayedBlur.rounded()), for: self)
+            self.pushBlur(start + (end - start) * progress)
             if progress >= 1 { t.invalidate(); self.blurTimer = nil }
         }
         RunLoop.main.add(timer, forMode: .common)

@@ -24,7 +24,7 @@ final class SpotlightOverlayWindow: NSPanel {
     static let baseHideAnimationDuration: TimeInterval = 0.15
     private static let liveChangeDuration: TimeInterval = 0.3
     private static let featherSteps = 5
-    static let edgePointsPerLevel: CGFloat = 4
+    static let edgePointsPerLevel: CGFloat = 2
 
     private var speed: Double = SpotlightConfig.defaultSpeed
     private var showAnimationDuration: TimeInterval { Self.baseShowAnimationDuration / speed }
@@ -179,7 +179,9 @@ final class SpotlightOverlayWindow: NSPanel {
         for (index, stage) in stages.enumerated() {
             // Layer 0 has the biggest hole, the last layer the smallest, so the
             // number of layers dimming a point grows with distance from the hole.
-            let grow = count > 1 ? featherPoints * CGFloat(count - index) / CGFloat(count) : 0
+            // Smallest layer hugs the window exactly, so the ramp starts right at
+            // its edge (no clear gap around it).
+            let grow = count > 1 ? featherPoints * CGFloat(count - 1 - index) / CGFloat(count) : 0
             let expanded = excludedFrames.map { $0.insetBy(dx: -grow, dy: -grow) }
             let merged = RectMerging.mergingOverlapping(expanded)
             let path = CGMutablePath()
