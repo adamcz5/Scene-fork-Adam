@@ -17,11 +17,16 @@ final class SpotlightStripPanel: NSPanel {
     private static let baseShowDuration: TimeInterval = 0.35
     private static let baseHideDuration: TimeInterval = 0.15
     private static let hoverDuration: TimeInterval = 0.12
+    /// After the pointer leaves, the bar stays clear this long before the dim
+    /// returns, then takes `returnDuration` to fade back in.
+    private static let returnDelay: TimeInterval = 1.5
+    private static let returnDuration: TimeInterval = 0.5
 
     private let tintView = NSView()
     private var speed: Double = SpotlightConfig.defaultSpeed
     private var blurRadius: Int = 0
     private var hovered = false
+    private var returnTimer: Timer?
     private var shown = false
 
     init(frame: CGRect) {
@@ -71,6 +76,9 @@ final class SpotlightStripPanel: NSPanel {
     /// Fades out and orders out; `immediate` skips the fade.
     func hide(immediate: Bool = false) {
         shown = false
+        returnTimer?.invalidate()
+        returnTimer = nil
+        hovered = false
         if immediate {
             alphaValue = 0
             clearBlur()
@@ -94,15 +102,29 @@ final class SpotlightStripPanel: NSPanel {
     /// back. The blur is switched off immediately rather than faded, since the
     /// window-background blur doesn't follow the window's alpha.
     func setHovered(_ isHovered: Bool) {
-        guard isHovered != hovered else { return }
-        hovered = isHovered
-        guard shown else { return }
         if isHovered {
+            returnTimer?.invalidate()
+            returnTimer = nil
+            guard !hovered else { return }
+            hovered = true
+            guard shown else { return }
             clearBlur()
+            animate(to: 0, duration: Self.hoverDuration, timing: .easeInEaseOut)
         } else {
-            applyBlur()
+            // Pointer left: keep the bar clear for a moment before dimming again.
+            guard hovered, returnTimer == nil else { return }
+            returnTimer = Timer.scheduledTimer(withTimeInterval: Self.returnDelay, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.finishHover() }
+            }
         }
-        animate(to: isHovered ? 0 : 1, duration: Self.hoverDuration, timing: .easeInEaseOut)
+    }
+
+    private func finishHover() {
+        returnTimer = nil
+        hovered = false
+        guard shown else { return }
+        applyBlur()
+        animate(to: 1, duration: Self.returnDuration, timing: .easeInEaseOut)
     }
 
     private func applyBlur() {
