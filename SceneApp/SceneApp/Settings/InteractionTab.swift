@@ -169,6 +169,7 @@ struct InteractionTab: View {
                 Picker("", selection: spotlightBinding(\.blurPreset)) {
                     Text("interaction.spotlight.blur.off").tag(SpotlightBlurPreset.off)
                     Text("interaction.spotlight.blur.light").tag(SpotlightBlurPreset.light)
+                    Text("interaction.spotlight.blur.medium").tag(SpotlightBlurPreset.medium)
                     Text("interaction.spotlight.blur.heavy").tag(SpotlightBlurPreset.heavy)
                 }
                 .labelsHidden()

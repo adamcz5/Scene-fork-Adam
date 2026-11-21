@@ -5781,6 +5781,12 @@
         "en": { "stringUnit": { "state": "translated", "value": "Per Monitor: one app per monitor stays visible." } }
       }
     },
+    "interaction.spotlight.blur.medium": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Medium" } }
+      }
+    },
     "menu.dim.tabs.help": {
       "extractionState": "manual",
       "localizations": {

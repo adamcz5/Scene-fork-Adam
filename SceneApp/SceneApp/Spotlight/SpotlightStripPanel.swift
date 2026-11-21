@@ -24,6 +24,9 @@ final class SpotlightStripPanel: NSPanel {
 
     private let tintView = NSView()
     private var speed: Double = SpotlightConfig.defaultSpeed
+    /// When set, the fade-in uses this speed instead of the top bar's own
+    /// (the first dim after a switch fades in together with the main dim).
+    var fadeSpeedOverride: Double?
     private var blurRadius: Int = 0
     private var hovered = false
     private var returnTimer: Timer?
@@ -70,7 +73,7 @@ final class SpotlightStripPanel: NSPanel {
         shown = true
         orderFrontRegardless()
         if !hovered { applyBlur() }
-        animate(to: hovered ? 0 : 1, duration: Self.baseShowDuration / speed, timing: .easeOut)
+        animate(to: hovered ? 0 : 1, duration: Self.baseShowDuration / (fadeSpeedOverride.map { min(max($0, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed) } ?? speed), timing: .easeOut)
     }
 
     /// Fades out and orders out; `immediate` skips the fade.
@@ -86,7 +89,7 @@ final class SpotlightStripPanel: NSPanel {
             return
         }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = Self.baseHideDuration / speed
+            ctx.duration = Self.baseHideDuration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             animator().alphaValue = 0
         }, completionHandler: { [weak self] in

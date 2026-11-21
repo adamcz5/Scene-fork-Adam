@@ -27,7 +27,8 @@ final class SpotlightOverlayWindow: NSPanel {
 
     private var speed: Double = SpotlightConfig.defaultSpeed
     private var showAnimationDuration: TimeInterval { Self.baseShowAnimationDuration / speed }
-    private var hideAnimationDuration: TimeInterval { Self.baseHideAnimationDuration / speed }
+    /// Un-dimming is always the same quick fade, independent of the fade-speed setting.
+    private var hideAnimationDuration: TimeInterval { Self.baseHideAnimationDuration }
 
     private let blurView = NSVisualEffectView()
     private let tintView = NSView()
@@ -158,15 +159,22 @@ final class SpotlightOverlayWindow: NSPanel {
 enum SpotlightLook {
     static func apply(blurView: NSVisualEffectView, tintView: NSView, darkness: Double, blur: SpotlightBlurPreset) {
         tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(min(max(darkness, 0), 1)).cgColor
+        // The system blur materials all blur about equally hard, so the weaker
+        // levels fade the blur view itself: a partial-opacity blur is a mix of
+        // sharp and blurred, i.e. a gentler blur.
+        blurView.material = .hudWindow
         switch blur {
         case .off:
             blurView.isHidden = true
         case .light:
             blurView.isHidden = false
-            blurView.material = .underWindowBackground
+            blurView.alphaValue = 0.25
+        case .medium:
+            blurView.isHidden = false
+            blurView.alphaValue = 0.55
         case .heavy:
             blurView.isHidden = false
-            blurView.material = .hudWindow
+            blurView.alphaValue = 1
         }
     }
 }

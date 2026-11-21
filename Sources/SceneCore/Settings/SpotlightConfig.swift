@@ -20,6 +20,7 @@ public enum SpotlightExclusionMode: String, Codable, CaseIterable, Sendable {
 public enum SpotlightBlurPreset: String, Codable, CaseIterable, Sendable {
     case off
     case light
+    case medium
     case heavy
 }
 
