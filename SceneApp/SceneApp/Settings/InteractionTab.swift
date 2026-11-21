@@ -161,7 +161,7 @@ struct InteractionTab: View {
                 Slider(
                     value: spotlightBinding(\.speed),
                     in: SpotlightConfig.minSpeed...SpotlightConfig.maxSpeed,
-                    step: 0.25
+                    step: 0.1
                 ) {
                     Text("interaction.spotlight.speed")
                 } minimumValueLabel: {
