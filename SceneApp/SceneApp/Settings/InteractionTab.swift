@@ -225,7 +225,7 @@ struct InteractionTab: View {
                 if settingsVM.spotlight.dimBrowserChrome {
                     Slider(
                         value: spotlightBinding(\.browserChromeDarkness),
-                        in: SpotlightConfig.minDarkness...0.95,
+                        in: 0.05...0.70,
                         step: 0.05
                     ) {
                         Text("interaction.spotlight.chrome.darkness")
