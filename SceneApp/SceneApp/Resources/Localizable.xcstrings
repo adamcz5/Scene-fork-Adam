@@ -5694,25 +5694,25 @@
     "menu.dim.tabs.light": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: Light" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: Lite" } }
       }
     },
     "interaction.spotlight.chrome.light.darkness": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Light mode darkness" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Lite mode darkness" } }
       }
     },
     "interaction.spotlight.chrome.light.blur": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Light mode blur" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Lite mode blur" } }
       }
     },
     "menu.dim.tabs.help": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Dim the browser's tab bar and address bar. Click to cycle Off, On, Light." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Dim the browser's tab bar and address bar. Click to cycle Off, On, Lite." } }
       }
     },
     "interaction.spotlight.section.hint": {

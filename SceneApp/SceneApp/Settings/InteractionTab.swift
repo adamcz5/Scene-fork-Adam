@@ -223,53 +223,14 @@ struct InteractionTab: View {
                     .foregroundStyle(.secondary)
 
                 if settingsVM.spotlight.dimBrowserChrome {
-                    Slider(
-                        value: spotlightBinding(\.browserChromeDarkness),
-                        in: 0.05...0.70,
-                        step: 0.05
-                    ) {
-                        Text("interaction.spotlight.chrome.darkness")
-                    } minimumValueLabel: {
-                        Text("interaction.spotlight.darkness.min")
-                    } maximumValueLabel: {
-                        Text("interaction.spotlight.darkness.max")
-                    }
-
-                    Slider(
-                        value: spotlightBinding(\.browserChromeBlurRadius),
-                        in: 0...SpotlightConfig.maxChromeBlurRadius,
-                        step: 1
-                    ) {
-                        Text("interaction.spotlight.chrome.blur")
-                    } minimumValueLabel: {
-                        Text("interaction.spotlight.blur.off")
-                    } maximumValueLabel: {
-                        Text("interaction.spotlight.blur.strong")
-                    }
-
-                    Slider(
-                        value: spotlightBinding(\.browserChromeLightDarkness),
-                        in: 0.05...0.70,
-                        step: 0.05
-                    ) {
-                        Text("interaction.spotlight.chrome.light.darkness")
-                    } minimumValueLabel: {
-                        Text("interaction.spotlight.darkness.min")
-                    } maximumValueLabel: {
-                        Text("interaction.spotlight.darkness.max")
-                    }
-
-                    Slider(
-                        value: spotlightBinding(\.browserChromeLightBlurRadius),
-                        in: 0...SpotlightConfig.maxChromeBlurRadius,
-                        step: 1
-                    ) {
-                        Text("interaction.spotlight.chrome.light.blur")
-                    } minimumValueLabel: {
-                        Text("interaction.spotlight.blur.off")
-                    } maximumValueLabel: {
-                        Text("interaction.spotlight.blur.strong")
-                    }
+                    uniformSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
+                                  range: 0.05...0.85, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                    uniformSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
+                                  range: 0...SpotlightConfig.maxChromeBlurRadius, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                    uniformSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
+                                  range: 0.05...0.85, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                    uniformSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
+                                  range: 0...SpotlightConfig.maxChromeBlurRadius, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
 
                     Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
                         Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
@@ -278,17 +239,9 @@ struct InteractionTab: View {
                     .pickerStyle(.segmented)
 
                     if settingsVM.spotlight.browserChromeMode == .fixedHeight {
-                        Slider(
-                            value: spotlightBinding(\.browserChromeHeight),
-                            in: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight,
-                            step: 2
-                        ) {
-                            Text("interaction.spotlight.chrome.height")
-                        } minimumValueLabel: {
-                            Text("interaction.spotlight.chrome.height.min")
-                        } maximumValueLabel: {
-                            Text("interaction.spotlight.chrome.height.max")
-                        }
+                        uniformSlider("interaction.spotlight.chrome.height", value: spotlightBinding(\.browserChromeHeight),
+                                      range: SpotlightConfig.minChromeHeight...SpotlightConfig.maxChromeHeight,
+                                      minLabel: "interaction.spotlight.chrome.height.min", maxLabel: "interaction.spotlight.chrome.height.max")
                         Text(String(format: String(localized: "interaction.spotlight.chrome.height.value"), Int(settingsVM.spotlight.browserChromeHeight)))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -609,6 +562,32 @@ struct InteractionTab: View {
     /// Read/write binding to one field of `SpotlightConfig`. Edits a COPY of
     /// the current config and saves the whole thing, so every other field —
     /// including ones this view doesn't show — is always carried through.
+    /// A labelled slider whose label and end captions have fixed widths, so every
+    /// slider's track is the same length, and which always has the same number
+    /// of steps (so one notch feels the same on every slider).
+    private func uniformSlider(
+        _ label: LocalizedStringKey,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        minLabel: LocalizedStringKey,
+        maxLabel: LocalizedStringKey
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .frame(width: 150, alignment: .leading)
+            Text(minLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .trailing)
+            Slider(value: value, in: range, step: (range.upperBound - range.lowerBound) / 20)
+                .frame(maxWidth: .infinity)
+            Text(maxLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .leading)
+        }
+    }
+
     private func spotlightBinding<T>(_ keyPath: WritableKeyPath<SpotlightConfig, T>) -> Binding<T> {
         Binding(
             get: { settingsVM.spotlight[keyPath: keyPath] },

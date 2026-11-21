@@ -88,8 +88,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     public var browserChromeLight: Bool
     public var browserChromeLightDarkness: Double
     public var browserChromeLightBlurRadius: Double
-    public static let defaultChromeLightDarkness: Double = 0.25
-    public static let defaultChromeLightBlurRadius: Double = 0
+    public static let defaultChromeLightDarkness: Double = 0.4
+    public static let defaultChromeLightBlurRadius: Double = 5
     /// Darkness / blur actually used for the top bar right now.
     public var effectiveChromeDarkness: Double { browserChromeLight ? browserChromeLightDarkness : browserChromeDarkness }
     public var effectiveChromeBlurRadius: Double { browserChromeLight ? browserChromeLightBlurRadius : browserChromeBlurRadius }
