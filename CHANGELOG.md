@@ -4,6 +4,52 @@ All notable changes to Scene. Newest releases are listed first.
 
 For binaries, see the [Releases page](https://github.com/ChiFungHillmanChan/macbook-resizer/releases).
 
+## V9.0.0 — Focus Mode (Dimming), Unified Layouts, Per-Display Workspaces
+
+First major release of this fork's rework. Everything below shipped incrementally as v8.3.x; v9.0.0 is the version we settled on after testing.
+
+### What's new
+
+**Focus Mode (Dimming)**
+- **Dim is now a proper feature with its own Settings card** (*Settings → Interaction → Focus Mode (Dimming)*), split into two sections: **Apps Dimming** and **Browser Tab Bar Dimming**.
+- **Apps Dimming:** Dim On/Off and Global / Per Monitor tiles (the same tiles as the menu bar), a dedicated **Apps Dim Shortcut**, and sliders for Darkness, Blur (Off / Light / Medium / Heavy), Fade delay and Fade speed. **Global** dims everything except one app across all monitors; **Per Monitor** keeps one app visible per monitor.
+- **Blur levels:** Light and Medium are stronger than before, Heavy is full strength again. Medium was added.
+- **Fade delay / Fade speed are real times:** 0 to 10 seconds in 0.5-second steps, for the apps and for the tab bar separately. Un-dimming is always a fixed, quick 0.15 seconds (it never follows the fade-speed slider).
+- **Live changes:** changing Darkness or Blur no longer restarts the dim — it glides from the current look to the new one. Only Fade delay / Fade speed restart it.
+- **No flicker when switching between windows that are already bright** (per-monitor mode); switching glides smoothly over 0.15 seconds.
+- **Excluded apps:** a manual list of apps that are never dimmed (e.g. keep Claude bright while working in Chrome).
+- **Browser Tab Bar Dimming (experimental):** dims just the tab strip, address bar and bookmarks of Chrome, Edge, Brave, Arc and Vivaldi while the page stays clear. On / Lite / Off tiles, a **Tab Bar Dim Shortcut**, its own Darkness and Blur (0–10, same scale for On and Lite), Lite-mode Darkness and Blur, and its own Fade delay and Fade speed. Hovering the bar clears it; after you move away it returns using the tab bar's own delay and speed. The outer 3% on the left and right edges is a proportional amount darker (it follows the Darkness slider) so the bar blends into a dark background. Detection can be automatic or a fixed height, with a **Test on open browser** button.
+- **Menu bar:** a wide Dim On/Off tile, then Global / Per Monitor and Tabs Dim (Off / On / Lite) tiles that show their current state.
+
+**Layouts and Workspaces**
+- **One layout editor** replaces the three old ones: a single **+ New layout** entry, a screen-aspect-ratio canvas, presets, and a clearer selection state. The editor is responsive again (see "Problems" below).
+- **"+ New layout" tile** in the workspace layout picker; per-display layouts and per-display zone/app assignment with visual pickers.
+- **Decluttered workspace editor:** apps to launch/quit collapsed into one list; Triggers moved to *Interaction* (collapsed); the workspace Focus-mode on/off Shortcuts moved to *Hotkeys*.
+- **Settings polish:** "Animation" renamed to **Window movement**; a *Tips* section (including window-title matching for multiple windows of the same app); the Accessibility "remove and re-add the app, don't just toggle it" reminder is now shown up front.
+- **In-app update** shows an install progress window.
+
+### Problems we ran into, and how they were solved
+
+- **Update looked stuck.** The install appeared frozen because macOS was waiting on a hidden Accessibility permission prompt. *Fix:* an install progress window, plus a reminder to remove and re-add the app instead of toggling it.
+- **Confusing menu-bar tiles.** Three controls that looked like two. *Fix:* tiles whose text shows their current state.
+- **Settings looked flat and wouldn't scroll.** A `Form` rendered without section boxes. *Fix:* a ScrollView with explicit cards and titled sections.
+- **Overlapping-layout editor was laggy and unclear.** Drags were measured in a moving coordinate space, handles sat under other slots, and click and drag were mixed up. *Fix:* a fixed named coordinate space, handles above all slots, separate tap-to-select and drag-to-move, a stronger selection highlight.
+- **"Focus Mode" meant two different things** (Dim vs. the macOS Focus shortcut). *Fix:* clarified, then moved the real Focus shortcuts to Hotkeys and named the Dim card Focus Mode (Dimming).
+- **Chrome's tab bar wasn't detected.** Chromium builds its accessibility tree lazily. *Fix:* switch it on (`AXManualAccessibility`), detect the page area, add a fixed-height fallback and a Test button.
+- **Tab bar too blurry and too dark.** System blur materials only come in fixed strong strengths. *Fix:* the tab bar got its own darkness and a continuous blur radius, later normalized to 0–10 levels shared by On and Lite. (Lite once used different scales than On — the same slider position looked different — fixed by using one scale.)
+- **Sliders kept being inconsistent.** Different widths, different step counts, different units (a fade "speed" multiplier vs. delay seconds). After repeated feedback: **one shared slider style** with fixed label/caption widths, every dimming slider with exactly 10 steps (delay and fade 0.5 s / 1 s steps as requested), fades shown in seconds, darkness/blur as 0–10 levels, and identical ranges for On and Lite.
+- **A "first dim happens together" rule broke things.** Syncing the tab bar and apps dim fought the individual delays/speeds. *Fix:* removed; apps and tab bar always use their own delay and speed.
+- **Fade speed hit a hidden limit and un-dim felt slow.** A clamp capped long fades at about 7 s, and un-dimming followed the fade slider. *Fix:* limit raised to the full 10 s; un-dim fixed at 0.15 s.
+- **Changing a setting restarted the dim.** *Fix:* darkness/blur changes now animate in place.
+- **Soft edges didn't work out.** Feathering the dim around windows removed dimming near the edge and showed visible stepped lines; blur bands under the tab bar looked sharp. *Fix:* removed entirely (back to hard edges), keeping only the proportional left/right shading on the tab bar.
+- **Heavy blur became see-through** after being turned down to 0.9. *Fix:* back to full strength. *Known limit:* Light and Medium are the Heavy blur shown at partial strength, which the system offers no cleaner way to do.
+- **The tab-bar blur jumped and lagged (worst in Lite).** This took several attempts. The system blur takes whole-number radii only, and I assumed it would not fade with the window, so I raised the radius by hand frame by frame. A small blur (Lite, radius ~4) therefore arrived in 3–4 visible jumps — the last step landing around 3.5 s of a 4 s fade — and the per-frame updates stuttered. A shared timer didn't fix it, and stacking extra blur panels made it flicker. *Real fix:* the assumption was wrong — the blur fades with the window. The radius is now set once and the panel's ease-in/ease-out fade brings the blur and the darkness in together. Smooth and lag-free.
+- **CI breaks along the way:** a type-checker timeout in one expression, handled by rewriting it as a plain loop; localization-file edits were done surgically and validated rather than re-formatted.
+
+### Notes
+- Release history before 9.0.0 (rollback points): v8.3.31 (before live changes and soft edges), v8.3.33 (blur levels), v8.3.39 (before the final tab-bar blur fix), v8.3.41 (the version this release is based on).
+- The Chinese changelog (`CHANGELOG.zh-HK.md`) was not updated for this release.
+
 ## V0.7.5 — Settings Toolbar Restored on macOS 26
 
 - **Every Settings toolbar button is back on macOS 26 (Tahoe).** On Layouts, the **+**, **+ Custom**, delete, reset-to-seed and **Restore Default Presets** buttons were all missing; on Workspaces, **New**, **Duplicate** and **Delete** were missing. With no toolbar, layouts and workspaces could be edited but never created, duplicated, or deleted — the entire create/delete surface of the app was unreachable from Settings, and the window looked unfinished. Reported as [#4](https://github.com/ChiFungHillmanChan/macbook-resizer/issues/4).
