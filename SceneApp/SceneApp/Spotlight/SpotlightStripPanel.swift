@@ -32,13 +32,6 @@ final class SpotlightStripPanel: NSPanel {
     private let bottomScale: CGFloat
     private var bands: [SpotlightStripPanel] = []
     private let isBand: Bool
-    private let isHelper: Bool
-    /// Two extra blur-only panels laid exactly over the bar. Stacked backdrop
-    /// blurs compound like Gaussians (radii combine as sqrt(a² + b² + c²)), so
-    /// three whole-number radii can make many more in-between strengths than one
-    /// — that is what keeps a SMALL blur (e.g. Lite) from arriving in 3-4 jumps.
-    private var blurHelpers: [SpotlightStripPanel] = []
-    private static let composeMaxRadius: Double = 8
     private var lastBlurInt: Int = -1
     private var speed: Double = SpotlightConfig.defaultSpeed
     /// Blur radius this panel should have when fully shown (already scaled for bands).
@@ -55,7 +48,6 @@ final class SpotlightStripPanel: NSPanel {
     /// The bar itself, plus (when `feather > 0`) soft-edge bands below it.
     convenience init(frame: CGRect, feather: CGFloat) {
         self.init(frame: frame, topScale: 1, bottomScale: 1)
-        blurHelpers = (0..<2).map { _ in SpotlightStripPanel(frame: frame, topScale: 1, bottomScale: 1, isHelper: true) }
         guard feather > 0 else { return }
         let count: Int = Self.bandCount
         let total = CGFloat(count)
@@ -76,11 +68,10 @@ final class SpotlightStripPanel: NSPanel {
         bands = made
     }
 
-    private init(frame: CGRect, topScale: CGFloat, bottomScale: CGFloat, isHelper: Bool = false) {
+    private init(frame: CGRect, topScale: CGFloat, bottomScale: CGFloat) {
         self.topScale = topScale
         self.bottomScale = bottomScale
         self.isBand = topScale != 1 || bottomScale != 1
-        self.isHelper = isHelper
         super.init(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -113,7 +104,7 @@ final class SpotlightStripPanel: NSPanel {
             gradient.endPoint = CGPoint(x: 0.5, y: 0)
             tintView.layer?.mask = gradient
         }
-        if !isBand && !isHelper { addSideShading(to: tintView) }
+        if !isBand { addSideShading(to: tintView) }
         contentView = tintView
         setFrame(frame, display: false)
     }
@@ -165,7 +156,6 @@ final class SpotlightStripPanel: NSPanel {
     private var midScale: Double { Double(topScale + bottomScale) / 2 }
 
     func apply(config: SpotlightConfig, animated: Bool = false) {
-        if isHelper { return }
         speed = min(max(config.browserChromeSpeed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
         returnDelay = max(config.browserChromeDelaySeconds, 0)
         let darkness = min(max(config.effectiveChromeDarkness, 0), 1)
@@ -200,10 +190,6 @@ final class SpotlightStripPanel: NSPanel {
         // hand over the same time and with the same ease-in/ease-out curve.
         if !isBand, !hovered { glideBlur(from: 0, duration: fade) }
         animate(to: hovered ? 0 : 1, duration: fade, timing: .easeInEaseOut)
-        for helper in blurHelpers {
-            helper.alphaValue = 1
-            helper.orderFrontRegardless()
-        }
         for band in bands { band.show(quick: quick) }
     }
 
@@ -220,7 +206,6 @@ final class SpotlightStripPanel: NSPanel {
             alphaValue = 0
             clearBlur()
             orderOut(nil)
-            for helper in blurHelpers { helper.orderOut(nil) }
             return
         }
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -233,7 +218,6 @@ final class SpotlightStripPanel: NSPanel {
             guard let self, !self.shown else { return }
             self.clearBlur()
             self.orderOut(nil)
-            for helper in self.blurHelpers { helper.orderOut(nil) }
         })
     }
 
@@ -275,46 +259,12 @@ final class SpotlightStripPanel: NSPanel {
     /// window-server call when the whole-number radius hasn't changed.
     private func pushBlur(_ radius: Double) {
         displayedBlur = radius
-        var main = Int((radius * (isBand ? midScale : 1)).rounded())
-        var extra = [0, 0]
-        if !isBand, !blurHelpers.isEmpty, targetBlur <= Self.composeMaxRadius {
-            let best = Self.composedRadii(for: radius, maxRadius: Int(targetBlur.rounded(.up)))
-            main = best.0
-            extra = [best.1, best.2]
+        let scaled = Int((radius * (isBand ? midScale : 1)).rounded())
+        if scaled != lastBlurInt {
+            lastBlurInt = scaled
+            WindowBackgroundBlur.set(radius: scaled, for: self)
         }
-        setWholeBlur(main)
-        for (helper, value) in zip(blurHelpers, extra) { helper.setWholeBlur(value) }
         for band in bands { band.pushBlur(radius) }
-    }
-
-    private func setWholeBlur(_ value: Int) {
-        guard value != lastBlurInt else { return }
-        lastBlurInt = value
-        WindowBackgroundBlur.set(radius: value, for: self)
-    }
-
-    /// The whole-number triple (a >= b >= c) whose combined blur
-    /// sqrt(a² + b² + c²) is closest to `radius`.
-    private static func composedRadii(for radius: Double, maxRadius: Int) -> (Int, Int, Int) {
-        var best: (Int, Int, Int) = (0, 0, 0)
-        var bestError = Double.greatestFiniteMagnitude
-        var bestSum = Int.max
-        let top = max(maxRadius, 0)
-        for a in 0...top {
-            for b in 0...a {
-                for c in 0...b {
-                    let combined = (Double(a * a + b * b + c * c)).squareRoot()
-                    let error = abs(combined - radius)
-                    let sum = a + b + c
-                    if error < bestError - 0.0001 || (abs(error - bestError) <= 0.0001 && sum < bestSum) {
-                        best = (a, b, c)
-                        bestError = error
-                        bestSum = sum
-                    }
-                }
-            }
-        }
-        return best
     }
 
     private func setBlur(_ radius: Double) {
