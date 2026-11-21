@@ -129,8 +129,11 @@ final class SpotlightStripPanel: NSPanel {
     func show(quick: Bool = false) {
         shown = true
         orderFrontRegardless()
-        if !hovered { setBlur(targetBlur) }
-        animate(to: hovered ? 0 : 1, duration: quick ? Self.baseHideDuration : Self.baseShowDuration / speed, timing: .easeOut)
+        let fade = quick ? Self.baseHideDuration : Self.baseShowDuration / speed
+        // The blur isn't part of the window's opacity fade, so it is ramped by
+        // hand over the same time and with the same ease-in/ease-out curve.
+        if !hovered { glideBlur(from: 0, duration: fade) }
+        animate(to: hovered ? 0 : 1, duration: fade, timing: .easeInEaseOut)
         for band in bands { band.show(quick: quick) }
     }
 
@@ -189,8 +192,9 @@ final class SpotlightStripPanel: NSPanel {
         returnTimer = nil
         hovered = false
         guard shown else { return }
-        setBlur(targetBlur)
-        animate(to: 1, duration: Self.baseShowDuration / speed, timing: .easeInEaseOut)
+        let fade = Self.baseShowDuration / speed
+        glideBlur(from: 0, duration: fade)
+        animate(to: 1, duration: fade, timing: .easeInEaseOut)
     }
 
     // MARK: - Blur
@@ -211,15 +215,17 @@ final class SpotlightStripPanel: NSPanel {
 
     /// The window-background blur call has no animation of its own, so a live
     /// change steps the radius by hand from where it is to the new value.
-    private func glideBlur() {
+    private func glideBlur(from startRadius: Double? = nil, duration: TimeInterval = SpotlightStripPanel.liveChangeDuration) {
         blurTimer?.invalidate()
-        let start = displayedBlur
+        let start = startRadius ?? displayedBlur
+        displayedBlur = start
+        WindowBackgroundBlur.set(radius: Int(start.rounded()), for: self)
         let end = targetBlur
         guard start != end else { return }
         let began = Date()
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] t in
             guard let self else { t.invalidate(); return }
-            let progress = min(Date().timeIntervalSince(began) / Self.liveChangeDuration, 1)
+            let progress = min(Date().timeIntervalSince(began) / max(duration, 0.01), 1)
             let eased = progress * progress * (3 - 2 * progress)
             self.displayedBlur = start + (end - start) * eased
             WindowBackgroundBlur.set(radius: Int(self.displayedBlur.rounded()), for: self)
