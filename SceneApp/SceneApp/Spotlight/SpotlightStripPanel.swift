@@ -60,9 +60,9 @@ final class SpotlightStripPanel: NSPanel {
 
     func apply(config: SpotlightConfig) {
         speed = min(max(config.speed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
-        let darkness = min(max(config.browserChromeDarkness, 0), 1)
+        let darkness = min(max(config.effectiveChromeDarkness, 0), 1)
         tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(darkness).cgColor
-        blurRadius = Int(min(max(config.browserChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius).rounded())
+        blurRadius = Int(min(max(config.effectiveChromeBlurRadius, 0), SpotlightConfig.maxChromeBlurRadius).rounded())
         if shown && !hovered { applyBlur() }
     }
 

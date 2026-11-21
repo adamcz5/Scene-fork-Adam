@@ -18,6 +18,8 @@ final class SpotlightConfigTests: XCTestCase {
         XCTAssertEqual(d.browserChromeBlurRadius, SpotlightConfig.defaultChromeBlurRadius)
         XCTAssertNil(d.browserChromeHotkey)
         XCTAssertEqual(d.exceptionBundleIDs, [])
+        XCTAssertFalse(d.browserChromeLight)
+        XCTAssertEqual(d.effectiveChromeDarkness, d.browserChromeDarkness)
     }
 
     func testCodableRoundTrip() throws {
@@ -35,7 +37,10 @@ final class SpotlightConfigTests: XCTestCase {
             browserChromeDarkness: 0.8,
             browserChromeBlurRadius: 8,
             browserChromeHotkey: HotkeyBinding(keyCode: 3, modifiers: [.command, .shift]),
-            exceptionBundleIDs: ["com.anthropic.claudefordesktop"]
+            exceptionBundleIDs: ["com.anthropic.claudefordesktop"],
+            browserChromeLight: true,
+            browserChromeLightDarkness: 0.3,
+            browserChromeLightBlurRadius: 2
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)

@@ -247,6 +247,30 @@ struct InteractionTab: View {
                         Text("interaction.spotlight.blur.strong")
                     }
 
+                    Slider(
+                        value: spotlightBinding(\.browserChromeLightDarkness),
+                        in: 0.05...0.70,
+                        step: 0.05
+                    ) {
+                        Text("interaction.spotlight.chrome.light.darkness")
+                    } minimumValueLabel: {
+                        Text("interaction.spotlight.darkness.min")
+                    } maximumValueLabel: {
+                        Text("interaction.spotlight.darkness.max")
+                    }
+
+                    Slider(
+                        value: spotlightBinding(\.browserChromeLightBlurRadius),
+                        in: 0...SpotlightConfig.maxChromeBlurRadius,
+                        step: 1
+                    ) {
+                        Text("interaction.spotlight.chrome.light.blur")
+                    } minimumValueLabel: {
+                        Text("interaction.spotlight.blur.off")
+                    } maximumValueLabel: {
+                        Text("interaction.spotlight.blur.strong")
+                    }
+
                     Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
                         Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
                         Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)

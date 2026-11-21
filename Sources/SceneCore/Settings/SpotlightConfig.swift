@@ -83,6 +83,16 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// the frontmost app — e.g. keep a chat window readable while working in
     /// a browser. Chosen manually in Settings.
     public var exceptionBundleIDs: [String]
+    /// "Light" variant of the top-bar dim, picked from the menu bar's Tabs tile
+    /// (Off → On → Light). Uses its own, gentler darkness and blur.
+    public var browserChromeLight: Bool
+    public var browserChromeLightDarkness: Double
+    public var browserChromeLightBlurRadius: Double
+    public static let defaultChromeLightDarkness: Double = 0.25
+    public static let defaultChromeLightBlurRadius: Double = 0
+    /// Darkness / blur actually used for the top bar right now.
+    public var effectiveChromeDarkness: Double { browserChromeLight ? browserChromeLightDarkness : browserChromeDarkness }
+    public var effectiveChromeBlurRadius: Double { browserChromeLight ? browserChromeLightBlurRadius : browserChromeBlurRadius }
     public static let maxChromeBlurRadius: Double = 20
     public static let defaultChromeBlurRadius: Double = 3
     /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
@@ -125,7 +135,10 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         browserChromeDarkness: Double = SpotlightConfig.defaultChromeDarkness,
         browserChromeBlurRadius: Double = SpotlightConfig.defaultChromeBlurRadius,
         browserChromeHotkey: HotkeyBinding? = nil,
-        exceptionBundleIDs: [String] = []
+        exceptionBundleIDs: [String] = [],
+        browserChromeLight: Bool = false,
+        browserChromeLightDarkness: Double = SpotlightConfig.defaultChromeLightDarkness,
+        browserChromeLightBlurRadius: Double = SpotlightConfig.defaultChromeLightBlurRadius
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -141,6 +154,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeBlurRadius = browserChromeBlurRadius
         self.browserChromeHotkey = browserChromeHotkey
         self.exceptionBundleIDs = exceptionBundleIDs
+        self.browserChromeLight = browserChromeLight
+        self.browserChromeLightDarkness = browserChromeLightDarkness
+        self.browserChromeLightBlurRadius = browserChromeLightBlurRadius
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -153,6 +169,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         case browserChromeBlurRadius
         case browserChromeHotkey
         case exceptionBundleIDs
+        case browserChromeLight, browserChromeLightDarkness, browserChromeLightBlurRadius
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -176,6 +193,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.browserChromeBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeBlurRadius) ?? Self.defaultChromeBlurRadius
         self.browserChromeHotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .browserChromeHotkey)
         self.exceptionBundleIDs = try c.decodeIfPresent([String].self, forKey: .exceptionBundleIDs) ?? []
+        self.browserChromeLight = try c.decodeIfPresent(Bool.self, forKey: .browserChromeLight) ?? false
+        self.browserChromeLightDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeLightDarkness) ?? Self.defaultChromeLightDarkness
+        self.browserChromeLightBlurRadius = try c.decodeIfPresent(Double.self, forKey: .browserChromeLightBlurRadius) ?? Self.defaultChromeLightBlurRadius
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -194,5 +214,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(browserChromeBlurRadius, forKey: .browserChromeBlurRadius)
         try c.encodeIfPresent(browserChromeHotkey, forKey: .browserChromeHotkey)
         try c.encode(exceptionBundleIDs, forKey: .exceptionBundleIDs)
+        try c.encode(browserChromeLight, forKey: .browserChromeLight)
+        try c.encode(browserChromeLightDarkness, forKey: .browserChromeLightDarkness)
+        try c.encode(browserChromeLightBlurRadius, forKey: .browserChromeLightBlurRadius)
     }
 }

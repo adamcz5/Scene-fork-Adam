@@ -5691,10 +5691,28 @@
         "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: Off" } }
       }
     },
+    "menu.dim.tabs.light": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Tabs dim: Light" } }
+      }
+    },
+    "interaction.spotlight.chrome.light.darkness": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Light mode darkness" } }
+      }
+    },
+    "interaction.spotlight.chrome.light.blur": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Light mode blur" } }
+      }
+    },
     "menu.dim.tabs.help": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Dim the browser's tab bar and address bar." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Dim the browser's tab bar and address bar. Click to cycle Off, On, Light." } }
       }
     },
     "interaction.spotlight.section.hint": {

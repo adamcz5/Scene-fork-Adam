@@ -253,7 +253,7 @@ struct MenuBarContentView: View {
                     action: toggleDimPerMonitor
                 )
                 dimTile(
-                    dim.dimBrowserChrome ? "menu.dim.tabs.on" : "menu.dim.tabs.off",
+                    !dim.dimBrowserChrome ? "menu.dim.tabs.off" : (dim.browserChromeLight ? "menu.dim.tabs.light" : "menu.dim.tabs.on"),
                     systemImage: "macwindow",
                     isOn: dim.dimBrowserChrome,
                     help: "menu.dim.tabs.help",
@@ -312,7 +312,16 @@ struct MenuBarContentView: View {
 
     private func toggleDimBrowserTabs() {
         var config = settingsVM.spotlight
-        config.dimBrowserChrome.toggle()
+        // Off → On → Light → Off
+        if !config.dimBrowserChrome {
+            config.dimBrowserChrome = true
+            config.browserChromeLight = false
+        } else if !config.browserChromeLight {
+            config.browserChromeLight = true
+        } else {
+            config.dimBrowserChrome = false
+            config.browserChromeLight = false
+        }
         try? settingsVM.store.setSpotlight(config)
     }
 
