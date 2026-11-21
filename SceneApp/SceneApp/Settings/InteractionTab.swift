@@ -224,13 +224,13 @@ struct InteractionTab: View {
 
                 if settingsVM.spotlight.dimBrowserChrome {
                     uniformSlider("interaction.spotlight.chrome.darkness", value: spotlightBinding(\.browserChromeDarkness),
-                                  range: 0.05...0.85, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                                  range: 0.35...0.70, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
                     uniformSlider("interaction.spotlight.chrome.blur", value: spotlightBinding(\.browserChromeBlurRadius),
                                   range: 0...SpotlightConfig.maxChromeBlurRadius, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
                     uniformSlider("interaction.spotlight.chrome.light.darkness", value: spotlightBinding(\.browserChromeLightDarkness),
-                                  range: 0.05...0.85, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
+                                  range: 0.05...0.70, minLabel: "interaction.spotlight.darkness.min", maxLabel: "interaction.spotlight.darkness.max")
                     uniformSlider("interaction.spotlight.chrome.light.blur", value: spotlightBinding(\.browserChromeLightBlurRadius),
-                                  range: 0...SpotlightConfig.maxChromeBlurRadius, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
+                                  range: 0...20, minLabel: "interaction.spotlight.blur.off", maxLabel: "interaction.spotlight.blur.strong")
 
                     Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
                         Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)

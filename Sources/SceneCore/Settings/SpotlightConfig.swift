@@ -93,7 +93,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     /// Darkness / blur actually used for the top bar right now.
     public var effectiveChromeDarkness: Double { browserChromeLight ? browserChromeLightDarkness : browserChromeDarkness }
     public var effectiveChromeBlurRadius: Double { browserChromeLight ? browserChromeLightBlurRadius : browserChromeBlurRadius }
-    public static let maxChromeBlurRadius: Double = 20
+    public static let maxChromeBlurRadius: Double = 40
     public static let defaultChromeBlurRadius: Double = 3
     /// Global hotkey that flips `dimBrowserChrome` — separate from `hotkey`,
     /// which toggles Dim as a whole.
