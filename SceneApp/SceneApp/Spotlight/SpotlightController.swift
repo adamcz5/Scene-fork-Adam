@@ -36,6 +36,11 @@ final class SpotlightController {
     /// undimmed, in which case focusing it must not dissolve the dim.
     private var shownExclusionFrames: [CGRect] = []
     private var showTimer: Timer?
+    /// Browser top-bar dimming layers (one per excluded browser window) and the
+    /// pointer poll that hides each while the mouse is over it.
+    private var stripPanels: [SpotlightStripPanel] = []
+    private var stripFrames: [CGRect] = []
+    private var hoverTimer: Timer?
 
     private var frontmostPID: pid_t?
     private var appElement: AXUIElement?
@@ -92,6 +97,7 @@ final class SpotlightController {
         let wasRunning = config.enabled && permissionGranted
         config = newConfig
         for overlay in overlays { overlay.apply(config: newConfig) }
+        for panel in stripPanels { panel.apply(config: newConfig) }
         if shouldRun, !wasRunning {
             start()
         } else if !shouldRun, wasRunning {
@@ -130,6 +136,7 @@ final class SpotlightController {
         teardownAppObserver()
         teardownWindowObserver()
         for overlay in overlays { overlay.hide(immediate: true) }
+        hideStrips(immediate: true)
         overlays.removeAll()
         isShown = false
         shownExclusionFrames = []
@@ -139,6 +146,7 @@ final class SpotlightController {
 
     private func rebuildOverlays() {
         for overlay in overlays { overlay.hide(immediate: true) }
+        hideStrips(immediate: true)
         guard config.enabled, permissionGranted else {
             overlays = []
             return
@@ -314,6 +322,7 @@ final class SpotlightController {
         showTimer = nil
         if isShown {
             for overlay in overlays { overlay.hide() }
+            hideStrips()
             isShown = false
             shownExclusionFrames = []
         }
@@ -331,13 +340,52 @@ final class SpotlightController {
         // frontmost app has no visible windows) — showing a full-screen dim
         // with no hole at all would be actively unhelpful, so skip.
         guard !frames.isEmpty else { return }
-        let reDim = config.dimBrowserChrome ? currentBrowserChromeFrames() : []
         for overlay in overlays {
-            overlay.updateHoles(excludedFrames: frames, reDimFrames: reDim, screenFrame: overlay.frame)
+            overlay.updateHoles(excludedFrames: frames, screenFrame: overlay.frame)
             overlay.show()
         }
+        showStrips(config.dimBrowserChrome ? currentBrowserChromeFrames() : [])
         isShown = true
         shownExclusionFrames = frames
+    }
+
+    // MARK: - Browser top-bar strips
+
+    private func showStrips(_ frames: [CGRect]) {
+        hideStrips(immediate: true)
+        guard !frames.isEmpty else { return }
+        stripFrames = frames
+        stripPanels = frames.map { frame in
+            let panel = SpotlightStripPanel(frame: frame)
+            panel.apply(config: config)
+            // Already hovering when the dim arrives: start faded out instead
+            // of flashing in for a poll tick.
+            panel.setHovered(frame.contains(NSEvent.mouseLocation))
+            panel.show()
+            return panel
+        }
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateStripHover() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        hoverTimer = timer
+    }
+
+    private func hideStrips(immediate: Bool = false) {
+        hoverTimer?.invalidate()
+        hoverTimer = nil
+        for panel in stripPanels { panel.hide(immediate: immediate) }
+        stripPanels = []
+        stripFrames = []
+    }
+
+    /// The strip panels ignore mouse events (clicks must reach the browser), so
+    /// hover is detected by polling the pointer against each strip's frame.
+    private func updateStripHover() {
+        let mouse = NSEvent.mouseLocation
+        for (panel, frame) in zip(stripPanels, stripFrames) {
+            panel.setHovered(frame.contains(mouse))
+        }
     }
 
     private func currentExclusionFrames() -> [CGRect] {

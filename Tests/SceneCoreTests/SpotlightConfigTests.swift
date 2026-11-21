@@ -14,6 +14,8 @@ final class SpotlightConfigTests: XCTestCase {
         XCTAssertFalse(d.dimBrowserChrome)
         XCTAssertEqual(d.browserChromeMode, .automatic)
         XCTAssertEqual(d.browserChromeHeight, SpotlightConfig.defaultChromeHeight)
+        XCTAssertEqual(d.browserChromeDarkness, SpotlightConfig.defaultChromeDarkness)
+        XCTAssertEqual(d.browserChromeBlur, .light)
     }
 
     func testCodableRoundTrip() throws {
@@ -27,7 +29,9 @@ final class SpotlightConfigTests: XCTestCase {
             hotkey: HotkeyBinding(keyCode: 2, modifiers: [.command, .option]),
             dimBrowserChrome: true,
             browserChromeMode: .fixedHeight,
-            browserChromeHeight: 120
+            browserChromeHeight: 120,
+            browserChromeDarkness: 0.8,
+            browserChromeBlur: .off
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(SpotlightConfig.self, from: data)

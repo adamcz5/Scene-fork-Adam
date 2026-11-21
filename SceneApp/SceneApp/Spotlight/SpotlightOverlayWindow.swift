@@ -88,44 +88,20 @@ final class SpotlightOverlayWindow: NSPanel {
     /// it only changes layer/material properties, not visibility.
     func apply(config: SpotlightConfig) {
         speed = min(max(config.speed, SpotlightConfig.minSpeed), SpotlightConfig.maxSpeed)
-        let darkness = min(max(config.darkness, 0), 1)
-        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(darkness).cgColor
-        switch config.blurPreset {
-        case .off:
-            blurView.isHidden = true
-        case .light:
-            blurView.isHidden = false
-            blurView.material = .underWindowBackground
-        case .heavy:
-            blurView.isHidden = false
-            blurView.material = .hudWindow
-        }
+        SpotlightLook.apply(blurView: blurView, tintView: tintView, darkness: config.darkness, blur: config.blurPreset)
     }
 
-    /// `excludedFrames` and `reDimFrames` are in the global NS
-    /// screen-coordinate system (bottom-left origin, matching
-    /// `NSScreen.frame`) — same convention as `AXWindow.frame` everywhere
-    /// else in this codebase. Converts to this window's own local
-    /// coordinates (origin at this screen's bottom-left), which — since
-    /// neither `blurView`/`tintView` override `isFlipped` — needs only a
-    /// translation, no vertical flip.
-    ///
-    /// `reDimFrames` (experimental browser-chrome dimming) are rects EXPECTED
-    /// to sit fully inside one of `excludedFrames` — e.g. a browser's tab
-    /// strip inside its own (excluded/undimmed) window. They're added to the
-    /// even-odd path as their own, separately-merged group: each one
-    /// overlaps its containing excluded rect an odd *additional* number of
-    /// times, flipping that one sub-region back to "filled" (dimmed) while
-    /// the rest of the excluded rect stays a hole. Merging `reDimFrames`
-    /// among themselves first (same reasoning as `RectMerging`'s doc comment)
-    /// keeps two overlapping chrome rects (e.g. tab strip + address bar) from
-    /// double-toggling each other back to undimmed.
-    func updateHoles(excludedFrames: [CGRect], reDimFrames: [CGRect] = [], screenFrame: CGRect) {
-        let mergedHoles = RectMerging.mergingOverlapping(excludedFrames)
-        let mergedReDim = RectMerging.mergingOverlapping(reDimFrames)
+    /// `excludedFrames` are in the global NS screen-coordinate system
+    /// (bottom-left origin, matching `NSScreen.frame`) — same convention as
+    /// `AXWindow.frame` everywhere else in this codebase. Converts to this
+    /// window's own local coordinates (origin at this screen's bottom-left),
+    /// which — since neither `blurView`/`tintView` override `isFlipped` —
+    /// needs only a translation, no vertical flip.
+    func updateHoles(excludedFrames: [CGRect], screenFrame: CGRect) {
+        let merged = RectMerging.mergingOverlapping(excludedFrames)
         let path = CGMutablePath()
         path.addRect(CGRect(origin: .zero, size: screenFrame.size))
-        for frame in mergedHoles + mergedReDim {
+        for frame in merged {
             let clipped = frame.intersection(screenFrame)
             guard !clipped.isEmpty else { continue }
             let local = CGRect(
@@ -173,5 +149,24 @@ final class SpotlightOverlayWindow: NSPanel {
             guard let self, self.alphaValue == 0 else { return }
             self.orderOut(nil)
         })
+    }
+}
+
+/// Maps the user's darkness + blur-preset choices onto a blur/tint view pair.
+/// Shared by the full-screen overlay and the browser top-bar panel, which have
+/// independent settings but identical machinery.
+enum SpotlightLook {
+    static func apply(blurView: NSVisualEffectView, tintView: NSView, darkness: Double, blur: SpotlightBlurPreset) {
+        tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(min(max(darkness, 0), 1)).cgColor
+        switch blur {
+        case .off:
+            blurView.isHidden = true
+        case .light:
+            blurView.isHidden = false
+            blurView.material = .underWindowBackground
+        case .heavy:
+            blurView.isHidden = false
+            blurView.material = .hudWindow
+        }
     }
 }

@@ -200,16 +200,36 @@ struct InteractionTab: View {
             }
 
             subBlock("interaction.spotlight.subsection.experimental", hint: "interaction.spotlight.dim_browser_chrome.hint") {
+                // Its own switch: independent of the main Dim toggle's other
+                // settings, and always editable (it only takes effect while
+                // Dim is on).
                 Toggle("interaction.spotlight.dim_browser_chrome", isOn: spotlightBinding(\.dimBrowserChrome))
-                    .disabled(!settingsVM.spotlight.enabled)
 
                 if settingsVM.spotlight.dimBrowserChrome {
+                    Slider(
+                        value: spotlightBinding(\.browserChromeDarkness),
+                        in: SpotlightConfig.minDarkness...0.95,
+                        step: 0.05
+                    ) {
+                        Text("interaction.spotlight.chrome.darkness")
+                    } minimumValueLabel: {
+                        Text("interaction.spotlight.darkness.min")
+                    } maximumValueLabel: {
+                        Text("interaction.spotlight.darkness.max")
+                    }
+
+                    Picker("interaction.spotlight.chrome.blur", selection: spotlightBinding(\.browserChromeBlur)) {
+                        Text("interaction.spotlight.blur.off").tag(SpotlightBlurPreset.off)
+                        Text("interaction.spotlight.blur.light").tag(SpotlightBlurPreset.light)
+                        Text("interaction.spotlight.blur.heavy").tag(SpotlightBlurPreset.heavy)
+                    }
+                    .pickerStyle(.segmented)
+
                     Picker("interaction.spotlight.chrome.mode", selection: spotlightBinding(\.browserChromeMode)) {
                         Text("interaction.spotlight.chrome.mode.auto").tag(SpotlightChromeMode.automatic)
                         Text("interaction.spotlight.chrome.mode.fixed").tag(SpotlightChromeMode.fixedHeight)
                     }
                     .pickerStyle(.segmented)
-                    .disabled(!settingsVM.spotlight.enabled)
 
                     if settingsVM.spotlight.browserChromeMode == .fixedHeight {
                         Slider(

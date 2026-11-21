@@ -5589,6 +5589,18 @@
         "en": { "stringUnit": { "state": "translated", "value": "%@: couldn't see where the page starts. Try “Fixed height” instead." } }
       }
     },
+    "interaction.spotlight.chrome.darkness": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top bar darkness" } }
+      }
+    },
+    "interaction.spotlight.chrome.blur": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top bar blur" } }
+      }
+    },
     "interaction.spotlight.section.hint": {
       "extractionState": "manual",
       "localizations": {
@@ -5700,7 +5712,7 @@
     "interaction.spotlight.subsection.experimental": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "EXPERIMENTAL" } }
+        "en": { "stringUnit": { "state": "translated", "value": "BROWSER TOP BAR (EXPERIMENTAL)" } }
       }
     },
     "interaction.spotlight.dim_browser_chrome": {
@@ -5712,7 +5724,7 @@
     "interaction.spotlight.dim_browser_chrome.hint": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Keeps the browser's tab strip, address bar and bookmarks dimmed while the page itself stays clear. Works with Chrome, Edge, Brave, Arc and Vivaldi. Automatic asks the browser where the page starts; if that doesn't work for you, use Fixed height and set how far down to dim." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Dims the browser's tab strip, address bar and bookmarks while the page stays clear. Move the mouse over the bar and it clears so you can use it. This switch is independent of the rest of Dim, but only has an effect while Dim is on. Works with Chrome, Edge, Brave, Arc and Vivaldi." } }
       }
     },
     "layouts.editor.quick_picker.show": {

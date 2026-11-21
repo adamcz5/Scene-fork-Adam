@@ -70,7 +70,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
     public var browserChromeMode: SpotlightChromeMode
     /// Height in points of the dimmed top strip in `.fixedHeight` mode.
     public var browserChromeHeight: Double
+    /// The top bar is dimmed by its own layer, separate from the main dim, so
+    /// it can be darker and less blurred (blurring tabs makes them unreadable
+    /// well before they're hidden enough).
+    public var browserChromeDarkness: Double
+    public var browserChromeBlur: SpotlightBlurPreset
 
+    public static let defaultChromeDarkness: Double = 0.6
     public static let minChromeHeight: Double = 40
     public static let maxChromeHeight: Double = 220
     public static let defaultChromeHeight: Double = 90
@@ -102,7 +108,9 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         hotkey: HotkeyBinding? = nil,
         dimBrowserChrome: Bool = false,
         browserChromeMode: SpotlightChromeMode = .automatic,
-        browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight
+        browserChromeHeight: Double = SpotlightConfig.defaultChromeHeight,
+        browserChromeDarkness: Double = SpotlightConfig.defaultChromeDarkness,
+        browserChromeBlur: SpotlightBlurPreset = .light
     ) {
         self.enabled = enabled
         self.exclusionMode = exclusionMode
@@ -114,11 +122,13 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.dimBrowserChrome = dimBrowserChrome
         self.browserChromeMode = browserChromeMode
         self.browserChromeHeight = browserChromeHeight
+        self.browserChromeDarkness = browserChromeDarkness
+        self.browserChromeBlur = browserChromeBlur
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabled, exclusionMode, idleDelaySeconds, darkness, blurPreset, speed, hotkey, dimBrowserChrome
-        case browserChromeMode, browserChromeHeight
+        case browserChromeMode, browserChromeHeight, browserChromeDarkness, browserChromeBlur
     }
 
     /// Every field decodes with a fallback so a partially-written file (crash
@@ -138,6 +148,8 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         self.dimBrowserChrome = try c.decodeIfPresent(Bool.self, forKey: .dimBrowserChrome) ?? false
         self.browserChromeMode = try c.decodeIfPresent(SpotlightChromeMode.self, forKey: .browserChromeMode) ?? .automatic
         self.browserChromeHeight = try c.decodeIfPresent(Double.self, forKey: .browserChromeHeight) ?? Self.defaultChromeHeight
+        self.browserChromeDarkness = try c.decodeIfPresent(Double.self, forKey: .browserChromeDarkness) ?? Self.defaultChromeDarkness
+        self.browserChromeBlur = try c.decodeIfPresent(SpotlightBlurPreset.self, forKey: .browserChromeBlur) ?? .light
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -152,5 +164,7 @@ public struct SpotlightConfig: Codable, Equatable, Sendable {
         try c.encode(dimBrowserChrome, forKey: .dimBrowserChrome)
         try c.encode(browserChromeMode, forKey: .browserChromeMode)
         try c.encode(browserChromeHeight, forKey: .browserChromeHeight)
+        try c.encode(browserChromeDarkness, forKey: .browserChromeDarkness)
+        try c.encode(browserChromeBlur, forKey: .browserChromeBlur)
     }
 }
