@@ -47,16 +47,23 @@ final class SpotlightStripPanel: NSPanel {
     convenience init(frame: CGRect, feather: CGFloat) {
         self.init(frame: frame, topScale: 1, bottomScale: 1)
         guard feather > 0 else { return }
-        let count = Self.bandCount
-        let bandHeight = feather / CGFloat(count)
-        bands = (0..<count).map { i in
-            SpotlightStripPanel(
-                frame: CGRect(x: frame.minX, y: frame.minY - CGFloat(i + 1) * bandHeight,
-                              width: frame.width, height: bandHeight),
-                topScale: 1 - CGFloat(i) / CGFloat(count),
-                bottomScale: 1 - CGFloat(i + 1) / CGFloat(count)
+        let count: Int = Self.bandCount
+        let total = CGFloat(count)
+        let bandHeight: CGFloat = feather / total
+        var made: [SpotlightStripPanel] = []
+        for i in 0..<count {
+            let index = CGFloat(i)
+            let bandFrame = CGRect(
+                x: frame.minX,
+                y: frame.minY - (index + 1) * bandHeight,
+                width: frame.width,
+                height: bandHeight
             )
+            let top: CGFloat = 1 - index / total
+            let bottom: CGFloat = 1 - (index + 1) / total
+            made.append(SpotlightStripPanel(frame: bandFrame, topScale: top, bottomScale: bottom))
         }
+        bands = made
     }
 
     private init(frame: CGRect, topScale: CGFloat, bottomScale: CGFloat) {
