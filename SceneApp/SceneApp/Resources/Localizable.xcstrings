@@ -5655,10 +5655,28 @@
         "en": { "stringUnit": { "state": "translated", "value": "Dim: Off" } }
       }
     },
+    "menu.dim.light": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim: Light" } }
+      }
+    },
+    "menu.dim.medium": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim: Medium" } }
+      }
+    },
+    "menu.dim.heavy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Dim: Heavy" } }
+      }
+    },
     "menu.dim.help": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Turn the dimming on or off." } }
+        "en": { "stringUnit": { "state": "translated", "value": "Click to cycle: Off, Light, Medium, Heavy, Off." } }
       }
     },
     "menu.dim.mode.global": {

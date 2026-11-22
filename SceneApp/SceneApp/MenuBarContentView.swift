@@ -238,7 +238,7 @@ struct MenuBarContentView: View {
         let dim = settingsVM.spotlight
         return VStack(spacing: 6) {
             dimTile(
-                dim.enabled ? "menu.dim.on" : "menu.dim.off",
+                dimTitleKey(dim),
                 systemImage: "moon.fill",
                 isOn: dim.enabled,
                 help: "menu.dim.help",
@@ -285,9 +285,36 @@ struct MenuBarContentView: View {
         .buttonStyle(MenuRowButtonStyle())
     }
 
+    private func dimTitleKey(_ dim: SpotlightConfig) -> LocalizedStringKey {
+        if !dim.enabled { return "menu.dim.off" }
+        switch dim.blurPreset {
+        case .off: return "menu.dim.on"
+        case .light: return "menu.dim.light"
+        case .medium: return "menu.dim.medium"
+        case .heavy: return "menu.dim.heavy"
+        }
+    }
+
+    /// Off → Light → Medium → Heavy → Off. Sets the blur preset and the
+    /// enabled flag together. (A stored blur preset of "off" while enabled
+    /// counts as the first step, so it advances to Light.)
     private func toggleDimEnabled() {
         var config = settingsVM.spotlight
-        config.enabled.toggle()
+        if !config.enabled {
+            config.enabled = true
+            config.blurPreset = .light
+        } else {
+            switch config.blurPreset {
+            case .off:
+                config.blurPreset = .light
+            case .light:
+                config.blurPreset = .medium
+            case .medium:
+                config.blurPreset = .heavy
+            case .heavy:
+                config.enabled = false
+            }
+        }
         try? settingsVM.store.setSpotlight(config)
     }
 
