@@ -405,6 +405,7 @@ final class SpotlightController {
     private func showSpotlight() {
         showTimer = nil
         guard config.enabled, permissionGranted else { return }
+        if config.exclusionMode == .single, let windowElement, isFullScreen(windowElement) { return }
         var frames = currentExclusionFrames()
         // Nothing to protect (no focused window resolvable, or the
         // frontmost app has no visible windows) — showing a full-screen dim
@@ -423,6 +424,8 @@ final class SpotlightController {
 
     /// The top bar has its own delay, so it can come in before or after the
     /// main dim; it only needs Dim on and a recognized browser in front.
+    private var stripPollTick = 0
+
     private func showBrowserStrips() {
         stripTimer = nil
         guard config.enabled, permissionGranted, config.dimBrowserChrome else { return }
@@ -460,6 +463,14 @@ final class SpotlightController {
     /// The strip panels ignore mouse events (clicks must reach the browser), so
     /// hover is detected by polling the pointer against each strip's frame.
     private func updateStripHover() {
+        // Full screen can be entered without any focus change (video
+        // fullscreen), so re-check about twice a second.
+        stripPollTick += 1
+        if stripPollTick % 10 == 0, let windowElement, config.exclusionMode == .single,
+           isFullScreen(windowElement) {
+            hideStrips(immediate: true)
+            return
+        }
         let mouse = NSEvent.mouseLocation
         for (panel, frame) in zip(stripPanels, stripFrames) {
             panel.setHovered(frame.contains(mouse))
@@ -533,10 +544,27 @@ final class SpotlightController {
         }
     }
 
+    /// True for a window in macOS full screen (own Space) or one that covers a
+    /// whole display, e.g. a video player. Nothing should be dimmed over those.
+    private func isFullScreen(_ windowElement: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(windowElement, "AXFullScreen" as CFString, &value) == .success,
+           let flag = value as? Bool, flag {
+            return true
+        }
+        guard let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return false }
+        let nsFrame = DisplayCoordinates.axToNS(axFrame)
+        return NSScreen.screens.contains { screen in
+            nsFrame.width >= screen.frame.width - 2 && nsFrame.height >= screen.frame.height - 2
+                && nsFrame.intersects(screen.frame)
+        }
+    }
+
     private func browserChromeFrames(pid: pid_t?, windowElement: AXUIElement?) -> [CGRect] {
         guard let pid, let windowElement,
               let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
         else { return [] }
+        if isFullScreen(windowElement) { return [] }
         // Idempotent; covers the case where the setting was switched on while
         // this browser was already frontmost.
         if BrowserChromeDetector.isCandidate(bundleID: bundleID) { BrowserChromeDetector.prepare(pid: pid) }
