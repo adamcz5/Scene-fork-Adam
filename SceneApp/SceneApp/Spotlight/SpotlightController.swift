@@ -568,12 +568,40 @@ final class SpotlightController {
         // Idempotent; covers the case where the setting was switched on while
         // this browser was already frontmost.
         if BrowserChromeDetector.isCandidate(bundleID: bundleID) { BrowserChromeDetector.prepare(pid: pid) }
-        return BrowserChromeDetector.chromeRegions(
+        let regions = BrowserChromeDetector.chromeRegions(
             windowElement: windowElement,
             bundleID: bundleID,
             mode: config.browserChromeMode,
             fixedHeight: config.browserChromeHeight
         ) ?? []
+        return regions.filter { !isCoveredByWindowInFront($0, pid: pid, windowElement: windowElement) }
+    }
+
+    /// The strips float above every window, so a strip belonging to a window
+    /// that another window (e.g. a second Chrome window) sits in front of would
+    /// be painted over that front window. Skip such strips.
+    private func isCoveredByWindowInFront(_ strip: CGRect, pid: pid_t, windowElement: AXUIElement) -> Bool {
+        guard let axFrame = AXWindowLookup.axFrame(of: windowElement),
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return false }
+        let target = DisplayCoordinates.axToNS(axFrame)
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        for info in list {  // front to back
+            guard (info[kCGWindowLayer as String] as? Int) == 0,
+                  let owner = info[kCGWindowOwnerPID as String] as? pid_t, owner != ownPID,
+                  let dict = info[kCGWindowBounds as String] as? [String: Any],
+                  let cg = CGRect(dictionaryRepresentation: dict as CFDictionary),
+                  cg.width > 40, cg.height > 40
+            else { continue }
+            let frame = DisplayCoordinates.axToNS(cg)
+            let isTarget = owner == pid
+                && abs(frame.minX - target.minX) <= 2 && abs(frame.minY - target.minY) <= 2
+                && abs(frame.width - target.width) <= 2 && abs(frame.height - target.height) <= 2
+            if isTarget { return false }  // reached the target: nothing in front covers it
+            let overlap = frame.intersection(strip)
+            if !overlap.isNull, overlap.width > 4, overlap.height > 4 { return true }
+        }
+        return false
     }
 
     /// Remembers which screen a just-focused window landed on, so
