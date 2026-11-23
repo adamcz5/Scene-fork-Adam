@@ -405,7 +405,6 @@ final class SpotlightController {
     private func showSpotlight() {
         showTimer = nil
         guard config.enabled, permissionGranted else { return }
-        if config.exclusionMode == .single, let windowElement, isFullScreen(windowElement) { return }
         var frames = currentExclusionFrames()
         // Nothing to protect (no focused window resolvable, or the
         // frontmost app has no visible windows) — showing a full-screen dim
