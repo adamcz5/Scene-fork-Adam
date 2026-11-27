@@ -609,10 +609,17 @@ final class SpotlightController {
     private func recordPerScreenTarget(pid: pid_t, windowElement: AXUIElement) {
         guard let axFrame = AXWindowLookup.axFrame(of: windowElement) else { return }
         let nsFrame = DisplayCoordinates.axToNS(axFrame)
-        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(nsFrame) }),
-              let id = Self.displayID(for: screen)
-        else { return }
-        perScreenTargets[id] = PerScreenTarget(pid: pid, windowElement: windowElement)
+        // A window can straddle two displays; it is then the visible window of
+        // every display it meaningfully covers, not just the first one found.
+        // Otherwise the other display keeps a stale target (e.g. Slack stays
+        // the "active" window there while you work in the straddling one).
+        for screen in NSScreen.screens {
+            let overlap = screen.frame.intersection(nsFrame)
+            guard !overlap.isNull, overlap.width > 60, overlap.height > 60,
+                  let id = Self.displayID(for: screen)
+            else { continue }
+            perScreenTargets[id] = PerScreenTarget(pid: pid, windowElement: windowElement)
+        }
     }
 
     private static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
